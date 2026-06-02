@@ -109,7 +109,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 .cat-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;text-align:right;flex-shrink:0;}
 
 /* ── UPLOAD ZONE ── */
-.upzone{border:2px dashed rgba(255,255,255,.12);border-radius:22px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px;}
+.upzone{border:2px dashed rgba(255,255,255,.12);border-radius:22px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px;}
 .upzone.in{border-color:var(--green);background:var(--green-d);}
 .upzone.out{border-color:var(--red);background:var(--red-d);}
 .upzone:active{transform:scale(.98);}
@@ -120,6 +120,14 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 .tt-btn{flex:1;padding:10px;border-radius:12px;border:none;background:none;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;color:var(--muted);}
 .tt-btn.in.active{background:var(--green);color:#000;}
 .tt-btn.out.active{background:var(--red);color:#fff;}
+.upload-btns{display:flex;gap:10px;margin-bottom:12px;}
+.upload-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 10px;border-radius:18px;border:2px dashed rgba(255,255,255,.15);background:var(--s1);cursor:pointer;transition:all .2s;font-family:'Syne',sans-serif;}
+.upload-btn:active{transform:scale(.97);}
+.upload-btn.in{border-color:var(--green);background:var(--green-d);}
+.upload-btn.out{border-color:var(--red);background:var(--red-d);}
+.upload-btn-ico{font-size:30px;}
+.upload-btn-label{font-size:12px;font-weight:800;}
+.upload-btn-sub{font-size:10px;color:var(--muted);text-align:center;line-height:1.3;}
 
 /* ── PROCESSING ── */
 .proc-ov{position:fixed;inset:0;background:rgba(9,9,15,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:18px;}
@@ -205,12 +213,20 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
         <button class="tt-btn in active" id="tt-in" onclick="setUploadType('in')">📈 Entrada</button>
         <button class="tt-btn out" id="tt-out" onclick="setUploadType('out')">📉 Saída</button>
       </div>
-      <div class="upzone in" id="upzone" onclick="document.getElementById('file-in').click()">
-        <div class="upzone-ico" id="upzone-ico">📸</div>
-        <div class="upzone-title" id="upzone-title">Foto do comprovante</div>
-        <div class="upzone-sub" id="upzone-sub">Toque para abrir câmera ou galeria.<br/>A IA lê e registra tudo automaticamente.</div>
+      <div class="upload-btns" id="upload-btns">
+        <div class="upload-btn in" id="btn-camera" onclick="document.getElementById('file-camera').click()">
+          <div class="upload-btn-ico">📸</div>
+          <div class="upload-btn-label">Câmera</div>
+          <div class="upload-btn-sub">Foto agora</div>
+        </div>
+        <div class="upload-btn in" id="btn-gallery" onclick="document.getElementById('file-gallery').click()">
+          <div class="upload-btn-ico">🖼️</div>
+          <div class="upload-btn-label">Galeria</div>
+          <div class="upload-btn-sub">Várias de uma vez</div>
+        </div>
       </div>
-      <input type="file" id="file-in" accept="image/*" multiple capture="environment" style="display:none" onchange="handleFiles(this.files)"/>
+      <input type="file" id="file-camera" accept="image/*" capture="environment" style="display:none" onchange="handleFiles(this.files)"/>
+      <input type="file" id="file-gallery" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)"/>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-top:4px">
         <div style="font-size:12px;font-weight:700;margin-bottom:10px">🤖 O que a IA identifica</div>
         <div id="ai-tips-list"></div>
@@ -348,7 +364,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1';
+const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_api_key';
 
 const CAT_IN = [
   {id:'venda_cartao',  label:'Venda Cartão',   icon:'💳', cor:'#00E5A0'},
@@ -776,10 +792,26 @@ function renderConfig(){
     </div>`).join('')}</div>
 
   <div style="margin-top:24px;padding:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted)">CHAVE API (ANTHROPIC)</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Necessária para a IA ler os comprovantes. Obtenha em console.anthropic.com</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="api-key-input" type="password" placeholder="sk-ant-..." value="${localStorage.getItem(SK_KEY)||''}"
+        style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;font-family:'IBM Plex Mono',monospace"/>
+      <button onclick="saveApiKey()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#000;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;cursor:pointer">Salvar</button>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;padding:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px">
     <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted)">DADOS</div>
     <button class="btn-p btn-del" style="margin-top:0" onclick="if(confirm('Apagar TODOS os lançamentos?')){lancamentos=[];save();renderPage(currentTab);showToast('🗑️','Dados apagados');}">🗑️ Apagar todos os lançamentos</button>
   </div>`;
   document.getElementById('cfg-content').innerHTML=html;
+}
+function saveApiKey(){
+  const k=document.getElementById('api-key-input').value.trim();
+  if(!k){showToast('⚠️','Digite a chave antes de salvar');return;}
+  localStorage.setItem(SK_KEY,k);
+  showToast('✅','Chave salva!');
 }
 
 // ── UNIT MANAGEMENT (simple inline prompt for now) ──
@@ -1002,13 +1034,11 @@ function setUploadType(t){
   uploadType=t;
   document.getElementById('tt-in').classList.toggle('active',t==='in');
   document.getElementById('tt-out').classList.toggle('active',t==='out');
-  const zone=document.getElementById('upzone');
-  zone.className='upzone '+(t==='in'?'in':'out');
-  document.getElementById('upzone-ico').textContent=t==='in'?'📸':'🧾';
-  document.getElementById('upzone-title').textContent=t==='in'?'Foto do comprovante':'Foto da nota/recibo';
-  document.getElementById('upzone-sub').textContent=t==='in'
-    ?'Toque para abrir câmera ou galeria.\nA IA lê e registra tudo automaticamente.'
-    :'Fotografe nota fiscal, recibo ou comprovante de despesa.\nA IA identifica valor, categoria e fornecedor.';
+  const cls=t==='in'?'in':'out';
+  document.getElementById('btn-camera').className=`upload-btn ${cls}`;
+  document.getElementById('btn-gallery').className=`upload-btn ${cls}`;
+  document.getElementById('btn-camera').querySelector('.upload-btn-ico').textContent=t==='in'?'📸':'📷';
+  document.getElementById('btn-gallery').querySelector('.upload-btn-ico').textContent=t==='in'?'🖼️':'🧾';
   renderAiTips();
 }
 
@@ -1048,8 +1078,16 @@ Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionari
 
   const prompt=tipo==='in'?promptIn:promptOut;
 
+  const apiKey=localStorage.getItem(SK_KEY)||'';
+  if(!apiKey) throw new Error('Chave de API não configurada. Vá em Config → Chave API.');
   const r=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true',
+    },
     body:JSON.stringify({
       model:'claude-sonnet-4-20250514',max_tokens:600,
       messages:[{role:'user',content:[
@@ -1058,9 +1096,14 @@ Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionari
       ]}]
     })
   });
+  if(!r.ok){
+    const err=await r.json().catch(()=>({}));
+    throw new Error(err?.error?.message||`Erro da API (${r.status})`);
+  }
   const data=await r.json();
   const text=data.content?.find(b=>b.type==='text')?.text||'';
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
+  if(!text) throw new Error('Resposta vazia da IA');
+  return JSON.parse(text.replace(/```json[\s\S]*?```|```/g,'').trim());
 }
 
 async function handleFiles(files){
@@ -1119,6 +1162,8 @@ async function handleFiles(files){
   fill.style.width='100%';
   setTimeout(()=>{ ov.classList.add('hidden'); fill.style.width='0%'; },400);
   setTimeout(()=>setTab('lancamentos'),600);
+  document.getElementById('file-camera').value='';
+  document.getElementById('file-gallery').value='';
 }
 
 // ══════════════════════════════════════════════════
