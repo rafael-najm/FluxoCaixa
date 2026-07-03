@@ -348,7 +348,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1';
+const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
+const OR_MODEL = 'anthropic/claude-sonnet-4';
 
 const CAT_IN = [
   {id:'venda_cartao',  label:'Venda Cartão',   icon:'💳', cor:'#00E5A0'},
@@ -748,8 +749,20 @@ function renderRelatorio(){
 // CONFIG
 // ══════════════════════════════════════════════════
 function renderConfig(){
+  const apiKey=localStorage.getItem(SK_KEY)||'';
   let html=`
-  <div class="sh" style="margin-top:4px"><div class="st">Unidades</div><div class="sa" onclick="openAddUnit()">+ Nova</div></div>
+  <div class="sh" style="margin-top:4px"><div class="st">🤖 Reconhecimento por IA</div></div>
+  <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Chave de API da <b>OpenRouter</b> usada para ler os comprovantes por foto. Crie a sua em openrouter.ai/keys.</div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Chave de API (OpenRouter)</label>
+      <input type="password" id="cfg-apikey" placeholder="sk-or-v1-..." value="${apiKey?'••••••••••••••••':''}" onfocus="if(this.value.startsWith('•'))this.value=''"/>
+    </div>
+    <button class="btn-p btn-green" style="margin-top:0" onclick="saveApiKey()">Salvar chave</button>
+    <div style="font-size:11px;margin-top:8px;color:${apiKey?'var(--green)':'var(--muted)'}">${apiKey?'✓ Chave configurada':'Nenhuma chave configurada'}</div>
+  </div>
+
+  <div class="sh"><div class="st">Unidades</div><div class="sa" onclick="openAddUnit()">+ Nova</div></div>
   <div class="lst">${units.map(u=>`
     <div class="row" onclick="openEditUnit('${u.id}')">
       <div class="row-ico" style="background:var(--s2)">${u.icon}</div>
@@ -780,6 +793,14 @@ function renderConfig(){
     <button class="btn-p btn-del" style="margin-top:0" onclick="if(confirm('Apagar TODOS os lançamentos?')){lancamentos=[];save();renderPage(currentTab);showToast('🗑️','Dados apagados');}">🗑️ Apagar todos os lançamentos</button>
   </div>`;
   document.getElementById('cfg-content').innerHTML=html;
+}
+
+function saveApiKey(){
+  const val=document.getElementById('cfg-apikey').value.trim();
+  if(!val || val.startsWith('•')){ showToast('ℹ️','Nada alterado'); return; }
+  localStorage.setItem(SK_KEY,val);
+  showToast('✅','Chave salva!');
+  renderConfig();
 }
 
 // ── UNIT MANAGEMENT (simple inline prompt for now) ──
@@ -1048,22 +1069,37 @@ Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionari
 
   const prompt=tipo==='in'?promptIn:promptOut;
 
-  const r=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',headers:{'Content-Type':'application/json'},
+  const apiKey=localStorage.getItem(SK_KEY);
+  if(!apiKey) throw new Error('Configure a chave de API em Config');
+
+  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer '+apiKey,
+      'HTTP-Referer':location.origin,
+      'X-Title':'FluxoCaixa'
+    },
     body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',max_tokens:600,
+      model:OR_MODEL,max_tokens:600,
       messages:[{role:'user',content:[
-        {type:'image',source:{type:'base64',media_type:mimeType,data:base64}},
-        {type:'text',text:prompt}
+        {type:'text',text:prompt},
+        {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
       ]}]
     })
   });
   const data=await r.json();
-  const text=data.content?.find(b=>b.type==='text')?.text||'';
+  if(data.error) throw new Error(data.error.message||'Erro na API');
+  const text=data.choices?.[0]?.message?.content||'';
   return JSON.parse(text.replace(/```json|```/g,'').trim());
 }
 
 async function handleFiles(files){
+  if(!localStorage.getItem(SK_KEY)){
+    showToast('⚠️','Configure a chave de IA em Config');
+    setTab('config');
+    return;
+  }
   const arr=Array.from(files);
   const ov=document.getElementById('proc-ov');
   const fill=document.getElementById('proc-fill');
