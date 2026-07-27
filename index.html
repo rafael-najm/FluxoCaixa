@@ -369,6 +369,7 @@ const CAT_OUT = [
   {id:'manutencao',   label:'Manutenção',       icon:'🔧', cor:'#94A3B8'},
   {id:'impostos',     label:'Impostos/Taxas',   icon:'📄', cor:'#F87171'},
   {id:'outros_out',   label:'Outros Gastos',    icon:'📌', cor:'#CBD5E1'},
+  {id:'pessoal',      label:'Retirada/Despesa Pessoal',icon:'🙋',cor:'#F472B6'},
 ];
 const ALL_CATS = [...CAT_IN, ...CAT_OUT];
 const PAGTYPE_LABEL = {debito:'Débito',credito_1x:'Créd 1x',credito_2_6x:'Créd 2-6x',credito_7x:'Créd 7x+',pix:'PIX/Dinheiro'};
@@ -377,6 +378,8 @@ const DEFAULT_UNITS = [
   {id:'u1',name:'Confecção',icon:'✂️'},
   {id:'u2',name:'Loja 1',icon:'👗'},
   {id:'u3',name:'Loja 2',icon:'👠'},
+  {id:'u4',name:'Loja 3',icon:'👚'},
+  {id:'u5',name:'Loja 4',icon:'👖'},
 ];
 const DEFAULT_MAQUINAS = [
   {id:'m1',name:'Stone Loja 1',unit:'u2',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#00C896'},
@@ -1029,7 +1032,7 @@ function setUploadType(t){
   document.getElementById('upzone-title').textContent=t==='in'?'Foto do comprovante':'Foto da nota/recibo';
   document.getElementById('upzone-sub').textContent=t==='in'
     ?'Toque para abrir câmera ou galeria.\nA IA lê e registra tudo automaticamente.'
-    :'Fotografe nota fiscal, recibo ou comprovante de despesa.\nA IA identifica valor, categoria e fornecedor.';
+    :'Fotografe nota, comprovante bancário ou até uma anotação escrita à mão com nome e valor.\nA IA identifica valor, categoria e fornecedor.';
   renderAiTips();
 }
 
@@ -1057,15 +1060,23 @@ ${listaCatIn}
 Retorne APENAS JSON:
 {"valor":número,"tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix","maquina_id":"id","cat":"id_categoria","desc":"descrição curta","data":"YYYY-MM-DD ou null"}`;
 
-  const promptOut=`Você é um extrator de dados financeiros brasileiro. Analise esta imagem de despesa (nota fiscal, recibo, comprovante de pagamento).
+  const promptOut=`Você é um extrator de dados financeiros brasileiro. Analise esta imagem de comprovante de despesa de uma confecção de roupa feminina com várias lojas.
+
+A imagem pode ser de formatos bem diferentes, todos válidos:
+- Nota fiscal ou recibo formal
+- Print de comprovante de pagamento/PIX do aplicativo do banco
+- Uma anotação manuscrita simples, só com o nome da pessoa/empresa e o valor, sem nenhum comprovante formal
+- Boleto ou conta de consumo (luz, água, telefone)
 
 Categorias de saída disponíveis:
 ${listaCatOut}
 
-Retorne APENAS JSON:
-{"valor":número,"cat":"id_categoria_mais_provavel","desc":"descrição curta do que é","forn":"nome fornecedor ou null","data":"YYYY-MM-DD ou null"}
+Se a categoria não ficar clara pelo conteúdo, use "outros_out". Use a categoria "pessoal" apenas se estiver claramente identificado como despesa pessoal/retirada do dono, não relacionada à confecção ou às lojas.
 
-Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionarios"; conta de luz → cat:"energia"; nota de costureira → cat:"confeccao"`;
+Retorne APENAS JSON:
+{"valor":número,"cat":"id_categoria_mais_provavel","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null"}
+
+Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionarios"; conta de luz → cat:"energia"; nota de costureira → cat:"confeccao"; anotação manuscrita "Maria - R$300" sem mais contexto → cat:"outros_out", forn:"Maria"`;
 
   const prompt=tipo==='in'?promptIn:promptOut;
 
