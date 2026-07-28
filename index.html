@@ -268,6 +268,27 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   padding:2px 6px;margin-top:6px;margin-right:5px;background:var(--blue-d);color:var(--blue);
   text-transform:uppercase;}
 
+/* ── DRE ── */
+.dre-top{padding:12px 14px;border-bottom:1px solid var(--border);}
+.dre-seg{display:flex;gap:0;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:2px;}
+.dre-sb{flex:1;padding:8px;border:none;background:none;border-radius:6px;font-family:var(--ui);
+  font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .12s;}
+.dre-sb.active{background:var(--bg);color:var(--accent);font-weight:600;box-shadow:0 1px 2px rgba(21,24,29,.06);}
+.dre-hint{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px;}
+.dre-body{padding:4px 0;}
+.dre-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 14px;}
+.dre-lbl{font-size:13px;color:var(--text2);}
+.dre-val{font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;}
+.dre-sub .dre-lbl{padding-left:12px;color:var(--muted);font-size:12.5px;}
+.dre-tot{background:var(--s2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.dre-tot .dre-lbl{font-weight:600;color:var(--text);}
+.dre-tot .dre-val{font-weight:600;}
+.dre-final{background:var(--accent-soft);border-top:1px solid #DCE4EE;border-bottom:1px solid #DCE4EE;}
+.dre-final .dre-lbl{font-weight:700;color:var(--text);font-size:14px;}
+.dre-final .dre-val{font-weight:700;font-size:16px;}
+.dre-pct{font-size:11px;color:var(--muted);font-weight:500;}
+.dre-nota{font-size:11px;color:var(--muted);line-height:1.55;padding:8px 14px;}
+
 /* ── EXTRATO ── */
 .ex-stat{display:flex;justify-content:space-between;align-items:center;padding:11px 0;
   border-bottom:1px solid var(--border);font-size:13px;color:var(--text2);}
@@ -373,9 +394,14 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
           <input type="number" id="l-valor" inputmode="decimal" placeholder="0,00" oninput="calcLancPreview()"/>
         </div>
         <div class="field">
-          <label>Data</label>
-          <input type="date" id="l-data"/>
+          <label id="l-data-lbl">Data</label>
+          <input type="date" id="l-data" onchange="calcAtraso()"/>
         </div>
+      </div>
+      <div class="field" id="l-venc-wrap">
+        <label>Vencimento (opcional)</label>
+        <input type="date" id="l-venc" onchange="calcAtraso()"/>
+        <div id="l-atraso" style="font-size:12px;margin-top:6px;display:none"></div>
       </div>
       <div class="field">
         <label>Categoria</label>
@@ -751,6 +777,13 @@ function acharCompPorForn(forn){
 
 // ── CONTAS FIXAS MENSAIS ──
 function mesDe(dataStr){ return (dataStr||'').slice(0,7); }
+// Vencimento da conta fixa no mês do pagamento, respeitando meses curtos.
+function vencDaFixa(f, dataPgto){
+  if(!f||!f.dia) return null;
+  const [y,m]=(dataPgto||today()).split('-').map(Number);
+  const ultimo=new Date(y,m,0).getDate();
+  return `${y}-${String(m).padStart(2,'0')}-${String(Math.min(f.dia,ultimo)).padStart(2,'0')}`;
+}
 function mesAtual(){ return today().slice(0,7); }
 // Considera paga quando há lançamento apontando explicitamente para a fixa no mês.
 // Sem vínculo explícito, deduz pela categoria+unidade — mas só quando existe uma
@@ -822,15 +855,53 @@ function setPeriod(p){ filter.period=p; save(); renderPeriodBar(); renderPage(cu
 // Abre direto o seletor de fotos: é o "maisinho" que ele aperta de noite.
 function pickFiles(){ document.getElementById('file-in').click(); }
 
+// Comprovante copiado (print, imagem do WhatsApp) entra direto, sem passar
+// pela galeria.
+async function colarComprovante(){
+  try{
+    if(!navigator.clipboard || !navigator.clipboard.read){
+      showToast('warn','Este navegador não deixa colar direto; use o +');
+      return;
+    }
+    const itens=await navigator.clipboard.read();
+    const arquivos=[];
+    for(const it of itens){
+      const tipo=(it.types||[]).find(t=>t.startsWith('image/'));
+      if(!tipo) continue;
+      const blob=await it.getType(tipo);
+      arquivos.push(new File([blob],'colado.png',{type:tipo}));
+    }
+    if(!arquivos.length){ showToast('warn','Não há imagem copiada'); return; }
+    handleFiles(arquivos);
+  }catch(e){
+    showToast('warn','Não consegui colar. Copie a imagem de novo e tente.');
+  }
+}
+
+// Colar pelo teclado/menu do sistema também funciona, menos quando ele está
+// colando texto num campo (o extrato, por exemplo).
+document.addEventListener('paste', e=>{
+  const alvo=e.target;
+  if(alvo && /^(INPUT|TEXTAREA)$/.test(alvo.tagName)) return;
+  const itens=[...((e.clipboardData&&e.clipboardData.items)||[])];
+  const imgs=itens.filter(i=>i.type && i.type.startsWith('image/'));
+  if(!imgs.length) return;
+  e.preventDefault();
+  const arquivos=imgs.map(i=>i.getAsFile()).filter(Boolean);
+  if(arquivos.length) handleFiles(arquivos);
+});
+
 function setTab(tab){
   currentTab=tab;
   ['home','lancamentos','revisao','relatorio','config'].forEach(t=>{
     document.getElementById('page-'+t).classList.toggle('hidden',t!==tab);
     document.getElementById('ni-'+t)?.classList.toggle('active',t===tab);
   });
-  // Na revisão o filtro de período não se aplica, e o + já existe dentro da tela.
+  // Na revisão o filtro de período não se aplica.
   document.getElementById('period-bar').style.display=tab==='revisao'?'none':'flex';
-  document.getElementById('fab-main').classList.toggle('hidden',tab==='revisao');
+  // O + some nas telas de leitura para não cobrir os números do relatório.
+  const semFab=['revisao','relatorio','config'].includes(tab);
+  document.getElementById('fab-main').classList.toggle('hidden',semFab);
   renderPage(tab);
 }
 function renderPage(tab){
@@ -963,12 +1034,16 @@ function rowHTML(l){
   const comp=l.comp_id?getComp(l.comp_id):null;
   const idx=comp?compPagamentos(comp.id).slice().sort((a,b)=>a.data.localeCompare(b.data)).findIndex(x=>x.id===l.id)+1:0;
   const compTag=comp?`<div class="row-meta" style="color:var(--yellow)">${idx}ª parcela de ${esc(comp.desc)} · falta ${fmt(compSaldo(comp))}</div>`:'';
+  const atraso=(!isIn&&l.data_venc)?diasEntre(l.data,l.data_venc):0;
+  const vencTag=(!isIn&&l.data_venc)
+    ? `<div class="row-meta" style="color:${atraso>0?'var(--red)':'var(--muted)'}">Venc. ${fmtDate(l.data_venc)}${atraso>0?` · pago ${atraso}d depois`:''}</div>`
+    : '';
   return `<div class="row" onclick="openEditLanc('${l.id}')">
     <div class="row-ico"><span class="sw" style="background:${cat.cor}"></span></div>
     <div class="row-info">
       <div class="row-name">${esc(l.desc||cat.label)}</div>
       <div class="row-meta">${esc(unit.name)} · ${cat.label} · ${fmtDateFull(l.data)}</div>
-      ${compTag}
+      ${vencTag}${compTag}
     </div>
     <div class="row-right">
       <div class="row-val" style="color:${isIn?(rec?'var(--green)':'var(--yellow)'):'var(--red)'}">${isIn?'+':'−'}${fmt(val)}</div>
@@ -1046,14 +1121,7 @@ function renderRelatorio(){
     <div class="st">Relatório Financeiro</div>
   </div>
 
-  <div class="rel-block">
-    <div class="rel-head">Resumo Geral</div>
-    <div class="rel-row"><div class="rel-lbl">Entradas (bruto)</div><div class="rel-val" style="color:var(--green)">${fmt(totalBruto)}</div></div>
-    <div class="rel-row"><div class="rel-lbl">Taxas de cartão</div><div class="rel-val" style="color:var(--yellow)">−${fmt(taxas)}</div></div>
-    <div class="rel-row"><div class="rel-lbl">Entradas (líquido)</div><div class="rel-val" style="color:var(--green)">${fmt(totalIn)}</div></div>
-    <div class="rel-row"><div class="rel-lbl">Total de saídas</div><div class="rel-val" style="color:var(--red)">−${fmt(totalOut)}</div></div>
-    <div class="rel-row rel-total"><div class="rel-lbl">Saldo do período</div><div class="rel-val" style="color:${saldo>=0?'var(--text)':'var(--red)'};font-size:16px">${fmt(saldo)}</div></div>
-  </div>
+  ${blocoDRE()}
 
   <div class="rel-block">
     <div class="rel-head">Fluxo de caixa</div>
@@ -1127,6 +1195,141 @@ function renderRelatorio(){
   }
 
   document.getElementById('rel-content').innerHTML=html;
+}
+
+// ── DRE ──
+// Contas agrupadas por natureza, como um contador espera ver.
+const DRE_CMV       = ['tecido','aviamentos','confeccao','embalagens','frete'];
+const DRE_PESSOAL   = ['funcionarios'];
+const DRE_COMERCIAL = ['marketing'];
+const DRE_ADMIN     = ['aluguel','energia','sistema','manutencao','tarifas','transporte','outros_out'];
+const DRE_IMPOSTOS  = ['impostos'];
+const ehRetirada = c => c==='pessoal' || (c||'').startsWith('pessoal_');
+
+// No regime de caixa vale quando o dinheiro entrou/saiu; no de competência,
+// quando a receita foi gerada e a despesa venceu.
+function dataRegime(l, regime){
+  if(regime==='caixa') return l.tipo==='in' ? (l.data_rec||l.data) : l.data;
+  return l.tipo==='in' ? l.data : (l.data_venc||l.data);
+}
+function lancDoRegime(regime){
+  const [ini,fim]=getPeriodRange();
+  return lancamentos.filter(l=>{
+    const d=dataRegime(l,regime);
+    return d>=ini && d<=fim && (filter.unit==='all'||l.unit===filter.unit);
+  });
+}
+function setRegime(r){ filter.regime=r; save(); renderRelatorio(); }
+
+function calcularDRE(regime){
+  const d=lancDoRegime(regime);
+  const ins=d.filter(l=>l.tipo==='in'), outs=d.filter(l=>l.tipo==='out');
+  const somaCats=cats=>outs.filter(l=>cats.includes(l.cat)).reduce((s,l)=>s+(l.valor||0),0);
+
+  const receitaBruta=ins.reduce((s,l)=>s+(l.valor||0),0);
+  const taxas=ins.reduce((s,l)=>s+((l.valor||0)-(l.valor_liquido||l.valor||0)),0);
+  const receitaLiquida=receitaBruta-taxas;
+  const cmv=somaCats(DRE_CMV);
+  const lucroBruto=receitaLiquida-cmv;
+  const pessoal=somaCats(DRE_PESSOAL);
+  const comercial=somaCats(DRE_COMERCIAL);
+  const admin=somaCats(DRE_ADMIN);
+  const despOper=pessoal+comercial+admin;
+  const resultOper=lucroBruto-despOper;
+  const impostos=somaCats(DRE_IMPOSTOS);
+  const resultLiquido=resultOper-impostos;
+  const retiradas=outs.filter(l=>ehRetirada(l.cat)).reduce((s,l)=>s+(l.valor||0),0);
+  const sobra=resultLiquido-retiradas;
+
+  // Nenhuma saída pode ficar de fora do demonstrativo.
+  const classificadas=new Set([...DRE_CMV,...DRE_PESSOAL,...DRE_COMERCIAL,...DRE_ADMIN,...DRE_IMPOSTOS]);
+  const naoClass=outs.filter(l=>!classificadas.has(l.cat)&&!ehRetirada(l.cat))
+    .reduce((s,l)=>s+(l.valor||0),0);
+
+  return {receitaBruta,taxas,receitaLiquida,cmv,lucroBruto,pessoal,comercial,admin,
+          despOper,resultOper,impostos,resultLiquido,retiradas,sobra,naoClass,
+          n:d.length};
+}
+
+function blocoDRE(){
+  const regime=filter.regime||'competencia';
+  const r=calcularDRE(regime);
+  const base=r.receitaLiquida||0;
+  const pct=v=>base>0?` <span class="dre-pct">${(v/base*100).toFixed(1)}%</span>`:'';
+  const cor=v=>v>=0?'var(--text)':'var(--red)';
+  const linha=(lbl,val,cls,sinal)=>`<div class="dre-row ${cls||''}">
+    <div class="dre-lbl">${lbl}</div>
+    <div class="dre-val" style="color:${cls==='dre-tot'||cls==='dre-final'?cor(val):'var(--text2)'}">${sinal==='-'&&val>0?'−':''}${fmt(Math.abs(val))}</div></div>`;
+
+  let h=`<div class="rel-block">
+    <div class="rel-head">Demonstração de resultado (DRE)</div>
+    <div class="dre-top">
+      <div class="dre-seg">
+        <button class="dre-sb${regime==='competencia'?' active':''}" onclick="setRegime('competencia')">Competência</button>
+        <button class="dre-sb${regime==='caixa'?' active':''}" onclick="setRegime('caixa')">Caixa</button>
+      </div>
+      <div class="dre-hint">${regime==='competencia'
+        ? 'Pela data do fato: venda no dia da venda, despesa no vencimento.'
+        : 'Pela data do dinheiro: venda quando cai na conta, despesa quando foi paga.'}</div>
+    </div>
+    <div class="dre-body">
+      ${linha('Receita bruta de vendas', r.receitaBruta)}
+      ${linha('(−) Taxas de maquininha', r.taxas, 'dre-sub', '-')}
+      ${linha('= Receita líquida', r.receitaLiquida, 'dre-tot')}
+      ${linha('(−) Custo das mercadorias (CMV)'+pct(r.cmv), r.cmv, 'dre-sub', '-')}
+      ${linha('= Lucro bruto'+pct(r.lucroBruto), r.lucroBruto, 'dre-tot')}
+      ${linha('(−) Pessoal', r.pessoal, 'dre-sub', '-')}
+      ${linha('(−) Administrativas', r.admin, 'dre-sub', '-')}
+      ${linha('(−) Comerciais', r.comercial, 'dre-sub', '-')}
+      ${linha('= Resultado operacional'+pct(r.resultOper), r.resultOper, 'dre-tot')}
+      ${linha('(−) Impostos', r.impostos, 'dre-sub', '-')}
+      ${linha('= Resultado líquido'+pct(r.resultLiquido), r.resultLiquido, 'dre-final')}
+      ${r.retiradas?`
+        <div class="dre-nota">Retiradas dos sócios não são despesa da empresa: são distribuição do lucro, por isso ficam abaixo do resultado.</div>
+        ${linha('(−) Retiradas dos sócios', r.retiradas, 'dre-sub', '-')}
+        ${linha('= Sobra depois das retiradas', r.sobra, 'dre-tot')}`:''}
+    </div>
+    ${r.naoClass?`<div class="dre-nota" style="color:var(--yellow)">${fmt(r.naoClass)} em saídas sem enquadramento entraram em Administrativas.</div>`:''}
+    <div style="padding:0 14px 14px">
+      <button class="btn-p btn-ghost" style="margin-top:6px" onclick="copiarDRE()">Copiar DRE</button>
+    </div>
+  </div>`;
+  return h;
+}
+
+// Texto pronto para mandar ao contador.
+async function copiarDRE(){
+  const regime=filter.regime||'competencia';
+  const r=calcularDRE(regime);
+  const [ini,fim]=getPeriodRange();
+  const un=filter.unit==='all'?'Todas as unidades':getUnit(filter.unit).name;
+  const ln=(l,v)=>`${l.padEnd(34,'.')} ${fmt(v)}`;
+  const txt=[
+    'DRE — '+un,
+    `Período: ${fmtDateFull(ini)} a ${fmtDateFull(fim)}`,
+    `Regime: ${regime==='competencia'?'Competência':'Caixa'}`,
+    '',
+    ln('Receita bruta de vendas', r.receitaBruta),
+    ln('(-) Taxas de maquininha', -r.taxas),
+    ln('= Receita liquida', r.receitaLiquida),
+    ln('(-) CMV', -r.cmv),
+    ln('= Lucro bruto', r.lucroBruto),
+    ln('(-) Pessoal', -r.pessoal),
+    ln('(-) Administrativas', -r.admin),
+    ln('(-) Comerciais', -r.comercial),
+    ln('= Resultado operacional', r.resultOper),
+    ln('(-) Impostos', -r.impostos),
+    ln('= RESULTADO LIQUIDO', r.resultLiquido),
+    ...(r.retiradas?['',ln('(-) Retiradas dos socios', -r.retiradas),ln('= Sobra apos retiradas', r.sobra)]:[]),
+    '',
+    `${r.n} lançamentos no período.`,
+  ].join('\n');
+  try{
+    await navigator.clipboard.writeText(txt);
+    showToast('ok','DRE copiado');
+  }catch(e){
+    prompt('Copie o DRE:', txt);
+  }
 }
 
 // ── BLOCOS DE RELATÓRIO ──
@@ -1479,10 +1682,28 @@ function onTipoChange(){
   document.getElementById('l-pagtype-wrap').style.display=showMaq?'block':'none';
   document.getElementById('l-comp-wrap').style.display=isIn?'none':'block';
   document.getElementById('l-fixa-wrap').style.display=isIn?'none':'block';
+  document.getElementById('l-venc-wrap').style.display=isIn?'none':'block';
+  document.getElementById('l-data-lbl').textContent=isIn?'Data':'Data do pagamento';
+  calcAtraso();
   if(!isIn) populateCompSelect();
   onCompChange();
   document.getElementById('l-save-btn').className='btn-p '+(isIn?'btn-green':'btn-red');
   calcLancPreview();
+}
+
+// Mostra na hora se o pagamento saiu antes, no dia ou depois do vencimento.
+function calcAtraso(){
+  const el=document.getElementById('l-atraso');
+  if(!el) return;
+  const tipo=document.getElementById('l-tipo').value;
+  const v=document.getElementById('l-venc').value;
+  const d=document.getElementById('l-data').value;
+  if(tipo==='in'||!v||!d){ el.style.display='none'; return; }
+  const dias=diasEntre(d,v);
+  el.style.display='block';
+  if(dias>0){ el.style.color='var(--red)'; el.textContent=`Pago ${dias} dia(s) depois do vencimento`; }
+  else if(dias<0){ el.style.color='var(--muted)'; el.textContent=`Pago ${-dias} dia(s) antes do vencimento`; }
+  else { el.style.color='var(--green)'; el.textContent='Pago no dia do vencimento'; }
 }
 
 function calcLancPreview(){
@@ -1530,6 +1751,7 @@ function openLanc(tipo){
   document.getElementById('l-forn').value='';
   document.getElementById('l-obs').value='';
   document.getElementById('l-data').value=today();
+  document.getElementById('l-venc').value='';
   document.getElementById('l-comp').value='';
   document.getElementById('l-comp-total').value='';
   document.getElementById('l-fixa').value='';
@@ -1553,12 +1775,13 @@ function openEditLanc(id){
   document.getElementById('l-forn').value=l.forn||'';
   document.getElementById('l-obs').value=l.obs||'';
   document.getElementById('l-data').value=l.data;
+  document.getElementById('l-venc').value=l.data_venc||'';
   document.getElementById('l-maquina').value=l.maq_id||maquinas[0]?.id||'';
   document.getElementById('l-pagtype').value=l.pagtype||'debito';
   document.getElementById('l-unit').value=l.unit||units[0]?.id||'';
   document.getElementById('l-comp').value=l.comp_id||'';
   document.getElementById('l-fixa').value=l.fixa_id||'';
-  onCompChange();
+  onCompChange(); calcAtraso();
   document.getElementById('l-del-btn').style.display='block';
   const iw=document.getElementById('mo-img-wrap');
   iw.innerHTML=imgTag(l,'rec-img');
@@ -1604,6 +1827,7 @@ function saveLanc(){
     maq_id:tipo==='in'?maqId:null,
     pagtype:tipo==='in'?pagtype:null,
     data:document.getElementById('l-data').value||today(),
+    data_venc:tipo==='out'?(document.getElementById('l-venc').value||null):null,
     data_rec:rec,
     desc, forn,
     obs:document.getElementById('l-obs').value,
@@ -2066,18 +2290,22 @@ Este pagamento pode ser uma PARCELA de uma despesa maior. Observe indícios como
 - Se indica que é parte de um total maior que ainda não está na lista, devolva o total em "valor_total".
 - Se é pagamento único e completo, devolva ambos como null.
 
+Nas saídas há duas datas diferentes, não confunda:
+- "data" é o dia em que foi PAGO (data do pagamento, da transferência, do PIX).
+- "data_venc" é o VENCIMENTO impresso no boleto/conta ("Vencimento", "Vence em", "Data de vencimento"). Se o documento não trouxer vencimento, devolva null.
+
 REGRA IMPORTANTE: não invente dados. Se algum campo não estiver legível ou não puder ser deduzido com segurança da imagem, devolva null nele e escreva em "duvidas" o que ficou faltando, em português simples, para a pessoa confirmar. É melhor perguntar do que errar. Em especial: quase nunca é possível saber a unidade/loja por um comprovante — só preencha "unit" se a imagem realmente indicar.
 
 Se a imagem não for um comprovante financeiro (foto aleatória, muito borrada, ilegível), devolva {"erro":"motivo curto"}.
 
 Retorne APENAS JSON, sem texto em volta:
-{"tipo":"in"|"out","valor":número,"cat":"id_categoria","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":"id ou null","comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","duvidas":["o que ficou incerto"]}
+{"tipo":"in"|"out","valor":número,"cat":"id_categoria","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":"id ou null","comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","duvidas":["o que ficou incerto"]}
 
 Exemplos:
 - Comprovante Stone R$ 250 débito → tipo:"in", valor:250, tipo_pag:"debito", cat:"venda_cartao", maquina_id da Stone
 - Foto de tecido com nota → tipo:"out", cat:"tecido"
 - Holerite → tipo:"out", cat:"funcionarios"
-- Conta de luz → tipo:"out", cat:"energia"
+- Conta de luz → tipo:"out", cat:"energia", com data_venc do vencimento impresso e data do dia em que foi pago
 - Anotação "Maria - R$300" → tipo:"out", cat:"outros_out", forn:"Maria", duvidas:["Não diz a que se refere o pagamento para Maria"]
 - Recibo "2ª parcela costureira Ana, R$300 de R$1000" → tipo:"out", valor:300, forn:"Ana", valor_total:1000, cat:"confeccao"`;
 
@@ -2293,7 +2521,7 @@ async function enviarNovosParaRevisao(){
       cat,
       desc:s.desc||n.linha.memo||'Débito do extrato',
       forn:s.forn||'',
-      data:n.linha.data,
+      data:n.linha.data, data_venc:null,
       unit:null, obs:n.linha.memo?('Extrato: '+n.linha.memo):'',
       img_key:null,
       comp_id:null, comp_novo_total:null, fixa_id:null,
@@ -2337,6 +2565,7 @@ function montarItemRevisao(res, imgKey, nome){
     desc: res.desc||'',
     forn: res.forn||'',
     data: /^\d{4}-\d{2}-\d{2}$/.test(res.data||'')?res.data:today(),
+    data_venc: /^\d{4}-\d{2}-\d{2}$/.test(res.data_venc||'')?res.data_venc:null,
     unit: (res.unit&&getUnit(res.unit).id)?res.unit:null,
     obs:'',
     img_key:imgKey,
@@ -2351,6 +2580,7 @@ function montarItemRevisao(res, imgKey, nome){
     it.fixa_id = res.fixa_id&&getFixa(res.fixa_id)?res.fixa_id:null;
     const fx=it.fixa_id?getFixa(it.fixa_id):null;
     if(fx&&!it.unit) it.unit=fx.unit;
+    if(fx&&fx.dia&&!it.data_venc) it.data_venc=vencDaFixa(fx,it.data);
     // Vínculo com despesa parcelada: id apontado pela IA, senão pelo fornecedor.
     let comp=res.comp_id?getComp(res.comp_id):null;
     if(comp&&compQuitado(comp)) comp=null;
@@ -2364,7 +2594,7 @@ function montarItemRevisao(res, imgKey, nome){
 
 function itemRevisaoVazio(imgKey, nome, motivo){
   return {rid:novoIdRev(),arquivo:nome,tipo:'out',valor:null,cat:null,desc:'',forn:'',
-    data:today(),unit:null,obs:'',img_key:imgKey,
+    data:today(),data_venc:null,unit:null,obs:'',img_key:imgKey,
     duvidas:[motivo||'Não consegui ler este comprovante'],falhou:true};
 }
 
@@ -2392,6 +2622,7 @@ function renderRevisao(){
         <div class="upzone-title">Comprovantes do dia</div>
         <div class="upzone-sub">Toque e selecione todos de uma vez.<br/>A IA identifica entradas e saídas sozinha.</div>
       </div>
+      <button class="btn-p btn-ghost" style="margin-top:0" onclick="colarComprovante()">Colar comprovante copiado</button>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-top:4px">
         <div style="font-size:12px;font-weight:700;margin-bottom:10px">O que a IA identifica</div>
         ${aiTipsHTML()}
@@ -2435,7 +2666,8 @@ function renderRevisao(){
     <button class="btn-p ${pend.length?'btn-ghost':'btn-green'}" onclick="lancarRevisao()">
       ${pend.length?`Lançar ${okN} pronto${okN===1?'':'s'} (${pend.length} ficam pendentes)`:`✓ Lançar ${revisao.length} lançamento${revisao.length===1?'':'s'}`}
     </button>
-    <button class="btn-p btn-ghost" onclick="pickFiles()">+ Adicionar mais comprovantes</button>
+    <button class="btn-p btn-ghost" onclick="pickFiles()">Adicionar mais comprovantes</button>
+    <button class="btn-p btn-ghost" onclick="colarComprovante()">Colar comprovante copiado</button>
     <button class="btn-p btn-ghost" onclick="openExtrato()">Conferir extrato bancário</button>
     <button class="btn-p btn-del" onclick="descartarRevisao()">Descartar remessa</button>
   </div>`;
@@ -2487,6 +2719,7 @@ function openRevisaoItem(i){
   document.getElementById('l-forn').value=it.forn||'';
   document.getElementById('l-obs').value=it.obs||'';
   document.getElementById('l-data').value=it.data||today();
+  document.getElementById('l-venc').value=it.data_venc||'';
   document.getElementById('l-unit').value=it.unit||'';
   if(it.tipo==='in'){
     if(it.maq_id) document.getElementById('l-maquina').value=it.maq_id;
@@ -2497,6 +2730,7 @@ function openRevisaoItem(i){
     document.getElementById('l-fixa').value=it.fixa_id||'';
     onCompChange();
   }
+  calcAtraso();
   const duv=(it.duvidas||[]).length
     ? `<div class="rev-duv-box">${it.duvidas.map(d=>`<div>${esc(d)}</div>`).join('')}</div>` : '';
   const wrap=document.getElementById('mo-img-wrap');
@@ -2521,6 +2755,7 @@ function salvarRevisaoItem(){
   it.forn=document.getElementById('l-forn').value;
   it.obs=document.getElementById('l-obs').value;
   it.data=document.getElementById('l-data').value||today();
+  it.data_venc=(tipo==='out'?(document.getElementById('l-venc').value||null):null);
   it.unit=document.getElementById('l-unit').value||null;
   if(tipo==='in'){
     it.maq_id=document.getElementById('l-maquina').value||null;
@@ -2584,6 +2819,7 @@ function lancarRevisao(){
       maq_id:it.tipo==='in'?it.maq_id:null,
       pagtype:it.tipo==='in'?it.pagtype:null,
       data:it.data,
+      data_venc:it.tipo==='out'?(it.data_venc||null):null,
       data_rec:it.tipo==='in'?calcDataRec(it.pagtype,maq):null,
       desc:it.desc||getCat(it.cat).label,
       forn:it.forn, obs:it.obs, unit:it.unit,
