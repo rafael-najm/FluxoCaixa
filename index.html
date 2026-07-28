@@ -291,6 +291,18 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
         <label>Unidade</label>
         <select id="l-unit"></select>
       </div>
+      <div class="field" id="l-comp-wrap">
+        <label>Faz parte de uma despesa maior?</label>
+        <select id="l-comp" onchange="onCompChange()"></select>
+      </div>
+      <div class="field" id="l-comp-new-wrap" style="display:none">
+        <label>Valor total dessa despesa (R$)</label>
+        <input type="number" id="l-comp-total" inputmode="decimal" placeholder="Ex: 1000,00" oninput="calcLancPreview()"/>
+      </div>
+      <div class="field" id="l-fixa-wrap">
+        <label>Conta fixa mensal (opcional)</label>
+        <select id="l-fixa"></select>
+      </div>
       <div class="field">
         <label>Descrição</label>
         <input type="text" id="l-desc" placeholder="Ex: Pagamento fornecedor tecido"/>
@@ -335,6 +347,26 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
   </div>
 </div>
 
+<!-- MODAL CONTA FIXA -->
+<div class="mo" id="mo-fixa">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt" id="mo-fixa-title">Nova Conta Fixa</div>
+    <div class="mb">
+      <div class="field"><label>Descrição</label><input type="text" id="fx-desc" placeholder="Ex: Aluguel Loja 1"/></div>
+      <div class="field"><label>Categoria</label><select id="fx-cat"></select></div>
+      <div class="two-col">
+        <div class="field"><label>Valor mensal (R$)</label><input type="number" id="fx-valor" inputmode="decimal" placeholder="0,00"/></div>
+        <div class="field"><label>Vence dia</label><input type="number" id="fx-dia" min="1" max="31" placeholder="10"/></div>
+      </div>
+      <div class="field"><label>Unidade</label><select id="fx-unit"></select></div>
+      <button class="btn-p btn-green" onclick="saveFixa()">Salvar conta fixa</button>
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-fixa')">Cancelar</button>
+      <button class="btn-p btn-del" id="fx-del-btn" onclick="deleteFixa()" style="display:none">Excluir conta fixa</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL UNIT PICKER -->
 <div class="mo" id="mo-unit">
   <div class="ms">
@@ -349,6 +381,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 // STATE
 // ══════════════════════════════════════════════════
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
+const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
 const CAT_IN = [
@@ -367,16 +400,48 @@ const CAT_OUT = [
   {id:'marketing',    label:'Marketing/Publicidade',icon:'📱',cor:'#34D399'},
   {id:'embalagens',   label:'Embalagens/Sacolas',icon:'🛍️',cor:'#6EE7B7'},
   {id:'manutencao',   label:'Manutenção',       icon:'🔧', cor:'#94A3B8'},
+  {id:'sistema',      label:'Sistema/Software',  icon:'💻', cor:'#38BDF8'},
   {id:'impostos',     label:'Impostos/Taxas',   icon:'📄', cor:'#F87171'},
   {id:'outros_out',   label:'Outros Gastos',    icon:'📌', cor:'#CBD5E1'},
 ];
-const ALL_CATS = [...CAT_IN, ...CAT_OUT];
+// Categoria legada: lançamentos antigos que usavam uma única categoria pessoal.
+const LEGACY_CATS = [{id:'pessoal',label:'Pessoal (sem sócio)',icon:'🙋',cor:'#F472B6'}];
+const SOCIO_CORES = ['#F472B6','#C084FC','#22D3EE','#FB7185','#A3E635'];
+
+// Categoria de retirada pessoal é gerada por sócio, para separar o gasto de cada um.
+function catSocioId(sid){ return 'pessoal_'+sid; }
+function catsSocios(){
+  return socios.map((s,i)=>({id:catSocioId(s.id),label:'Pessoal · '+s.name,icon:'🙋',cor:SOCIO_CORES[i%SOCIO_CORES.length],socio_id:s.id}));
+}
+function catsOut(){ return [...CAT_OUT, ...catsSocios()]; }
+function allCats(){ return [...CAT_IN, ...catsOut(), ...LEGACY_CATS]; }
+
+// Agrupamento das saídas para totais separados no fim do período.
+const GRUPOS = [
+  {id:'producao',   label:'Produção / Fornecedores', icon:'🏭', cor:'#A78BFA', cats:['tecido','aviamentos','confeccao','frete','embalagens']},
+  {id:'operacional',label:'Operacional / Fixas',     icon:'🏢', cor:'#FB923C', cats:['aluguel','energia','funcionarios','impostos','manutencao','marketing','sistema']},
+  {id:'pessoal',    label:'Retiradas dos sócios',    icon:'🙋', cor:'#F472B6', cats:[], socios:true},
+  {id:'outros',     label:'Outros',                  icon:'📌', cor:'#CBD5E1', cats:['outros_out']},
+];
+function grupoDaCat(catId){
+  if(catId==='pessoal'||catId.startsWith('pessoal_')) return GRUPOS.find(g=>g.id==='pessoal');
+  return GRUPOS.find(g=>g.cats.includes(catId)) || GRUPOS.find(g=>g.id==='outros');
+}
+
 const PAGTYPE_LABEL = {debito:'Débito',credito_1x:'Créd 1x',credito_2_6x:'Créd 2-6x',credito_7x:'Créd 7x+',pix:'PIX/Dinheiro'};
+
+const DEFAULT_SOCIOS = [
+  {id:'s1',name:'Theo'},
+  {id:'s2',name:'Ima'},
+  {id:'s3',name:'Zé'},
+];
 
 const DEFAULT_UNITS = [
   {id:'u1',name:'Confecção',icon:'✂️'},
   {id:'u2',name:'Loja 1',icon:'👗'},
   {id:'u3',name:'Loja 2',icon:'👠'},
+  {id:'u4',name:'Loja 3',icon:'👚'},
+  {id:'u5',name:'Loja 4',icon:'👖'},
 ];
 const DEFAULT_MAQUINAS = [
   {id:'m1',name:'Stone Loja 1',unit:'u2',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#00C896'},
@@ -389,31 +454,83 @@ let units    = JSON.parse(localStorage.getItem(SK_U)||'null') || DEFAULT_UNITS;
 let maquinas = JSON.parse(localStorage.getItem(SK_M)||'null') || DEFAULT_MAQUINAS;
 let lancamentos = JSON.parse(localStorage.getItem(SK_L)||'[]');
 let filter = JSON.parse(localStorage.getItem(SK_F)||'null') || {period:'mes',unit:'all'};
+let socios   = JSON.parse(localStorage.getItem(SK_S)||'null') || DEFAULT_SOCIOS;
+let compromissos = JSON.parse(localStorage.getItem(SK_C)||'[]');
+let fixas    = JSON.parse(localStorage.getItem(SK_FX)||'[]');
 
 let currentTab = 'home';
 let uploadType = 'in';
 let editingLancId = null;
 let editingMaqId  = null;
+let editingFixaId = null;
 
 function save(){
   localStorage.setItem(SK_L,JSON.stringify(lancamentos));
   localStorage.setItem(SK_M,JSON.stringify(maquinas));
   localStorage.setItem(SK_U,JSON.stringify(units));
   localStorage.setItem(SK_F,JSON.stringify(filter));
+  localStorage.setItem(SK_S,JSON.stringify(socios));
+  localStorage.setItem(SK_C,JSON.stringify(compromissos));
+  localStorage.setItem(SK_FX,JSON.stringify(fixas));
 }
 
 // ══════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════
 const fmt = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toISOString().split('T')[0];
 const fmtDate = d => { if(!d)return''; const[y,m,dd]=d.split('-'); return`${dd}/${m}`; };
 const fmtDateFull = d => { if(!d)return''; const[y,m,dd]=d.split('-'); return`${dd}/${m}/${y}`; };
 const fmtMonth = d => { if(!d)return''; const[y,m]=d.split('-'); const ms=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return`${ms[+m-1]}/${y.slice(2)}`; };
 
-function getCat(id){ return ALL_CATS.find(c=>c.id===id)||{label:id,icon:'📌',cor:'#888'}; }
+function getCat(id){ return allCats().find(c=>c.id===id)||{label:id,icon:'📌',cor:'#888'}; }
 function getMaq(id){ return maquinas.find(m=>m.id===id); }
 function getUnit(id){ return units.find(u=>u.id===id)||{name:'Todas',icon:'🏪'}; }
+function getSocio(id){ return socios.find(s=>s.id===id); }
+function getComp(id){ return compromissos.find(c=>c.id===id); }
+function getFixa(id){ return fixas.find(f=>f.id===id); }
+
+// ── DESPESAS PARCELADAS (compromissos) ──
+// Um compromisso é a despesa cheia (ex: costureira, R$1.000). Cada pagamento
+// parcial vira um lançamento normal apontando para ele via comp_id.
+function compPagamentos(cid){ return lancamentos.filter(l=>l.comp_id===cid); }
+function compPago(cid){ return compPagamentos(cid).reduce((s,l)=>s+(l.valor||0),0); }
+function compPagoExcluindo(cid, excludeId){
+  return lancamentos.filter(l=>l.comp_id===cid && l.id!==excludeId).reduce((s,l)=>s+(l.valor||0),0);
+}
+function compSaldo(c){ return (c.valor_total||0) - compPago(c.id); }
+function compQuitado(c){ return compSaldo(c) <= 0.005; }
+function compsAbertos(){ return compromissos.filter(c=>!compQuitado(c)); }
+
+const norm = s => (s||'').toString().trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+// Acha um compromisso em aberto cujo fornecedor bate com o do comprovante,
+// para vincular o pagamento parcial automaticamente.
+function acharCompPorForn(forn){
+  const f=norm(forn);
+  if(f.length<3) return null;
+  return compsAbertos().find(c=>{
+    const cf=norm(c.forn);
+    return cf.length>=3 && (cf===f || cf.includes(f) || f.includes(cf));
+  })||null;
+}
+
+// ── CONTAS FIXAS MENSAIS ──
+function mesDe(dataStr){ return (dataStr||'').slice(0,7); }
+function mesAtual(){ return today().slice(0,7); }
+// Considera paga quando há lançamento apontando explicitamente para a fixa no mês.
+// Sem vínculo explícito, deduz pela categoria+unidade — mas só quando existe uma
+// única conta fixa com essa combinação, senão o mesmo pagamento contaria em duas.
+function fixaPagamentos(f, mes){
+  const explicitos=lancamentos.filter(l=>l.tipo==='out'&&mesDe(l.data)===mes&&l.fixa_id===f.id);
+  if(explicitos.length) return explicitos;
+  const irmas=fixas.filter(x=>x.cat===f.cat&&x.unit===f.unit);
+  if(irmas.length!==1) return [];
+  return lancamentos.filter(l=>l.tipo==='out'&&mesDe(l.data)===mes&&!l.fixa_id&&l.cat===f.cat&&l.unit===f.unit);
+}
+function fixaPago(f, mes){ return fixaPagamentos(f,mes).reduce((s,l)=>s+(l.valor||0),0); }
 
 function calcLiquido(bruto, tipo, maq){
   if(!maq||tipo==='pix') return bruto;
@@ -547,6 +664,14 @@ function renderHome(){
     html+=`</div>`;
   }
 
+  const compAb=compromissos.filter(c=>!compQuitado(c)&&(filter.unit==='all'||c.unit===filter.unit));
+  if(compAb.length){
+    const falta=compAb.reduce((s,c)=>s+compSaldo(c),0);
+    html+=`<div class="sh"><div class="st">🧾 Despesas parceladas</div><div class="sa" onclick="setTab('relatorio')">Ver tudo →</div></div>`;
+    html+=`<div class="rel-block">${compAb.slice(0,3).map(c=>compRowHTML(c)).join('')}`;
+    html+=`<div class="rel-row" style="background:var(--s2)"><div class="rel-lbl" style="font-weight:700;color:var(--text)">Falta pagar</div><div class="rel-val" style="color:var(--yellow)">${fmt(falta)}</div></div></div>`;
+  }
+
   if(topCats.length){
     html+=`<div class="sh"><div class="st">📉 Maiores saídas</div></div><div class="lst">`;
     const maxV=topCats[0][1];
@@ -587,11 +712,15 @@ function rowHTML(l){
   const t0=today(); const rec=isIn&&(l.data_rec||l.data)<=t0;
   const val=isIn?(l.valor_liquido||l.valor):l.valor;
   const unit=getUnit(l.unit);
+  const comp=l.comp_id?getComp(l.comp_id):null;
+  const idx=comp?compPagamentos(comp.id).slice().sort((a,b)=>a.data.localeCompare(b.data)).findIndex(x=>x.id===l.id)+1:0;
+  const compTag=comp?`<div class="row-meta" style="color:var(--yellow)">🧾 ${idx}ª parcela de ${esc(comp.desc)} · falta ${fmt(compSaldo(comp))}</div>`:'';
   return `<div class="row" onclick="openEditLanc('${l.id}')">
     <div class="row-ico" style="background:${cat.cor}22">${cat.icon}</div>
     <div class="row-info">
-      <div class="row-name">${l.desc||cat.label}</div>
-      <div class="row-meta">${unit.icon} ${unit.name} · ${cat.label} · ${fmtDateFull(l.data)}</div>
+      <div class="row-name">${esc(l.desc||cat.label)}</div>
+      <div class="row-meta">${unit.icon} ${esc(unit.name)} · ${cat.label} · ${fmtDateFull(l.data)}</div>
+      ${compTag}
     </div>
     <div class="row-right">
       <div class="row-val" style="color:${isIn?(rec?'var(--green)':'var(--yellow)'):'var(--red)'}">${isIn?'+':'−'}${fmt(val)}</div>
@@ -684,6 +813,10 @@ function renderRelatorio(){
     <div class="rel-row"><div class="rel-lbl">A receber</div><div class="rel-val" style="color:var(--yellow)">${fmt(pendente)}</div></div>
   </div>`;
 
+  html+=blocoPrevisaoFixas();
+  html+=blocoCompromissos();
+  html+=blocoGrupos(data,totalOut);
+
   if(catRows.length){
     html+=`<div class="rel-block"><div class="rel-head">📉 Saídas por categoria</div>`;
     html+=catRows.map(([cid,val])=>{
@@ -707,6 +840,9 @@ function renderRelatorio(){
     }).join('');
     html+=`</div>`;
   }
+
+  html+=blocoSocios(data);
+  html+=blocoFornecedores(data);
 
   if(Object.keys(byUnit).length){
     html+=`<div class="rel-block"><div class="rel-head">🏪 Por unidade</div>`;
@@ -745,6 +881,129 @@ function renderRelatorio(){
   document.getElementById('rel-content').innerHTML=html;
 }
 
+// ── BLOCOS DE RELATÓRIO ──
+
+// Previsão do mês corrente a partir das contas fixas cadastradas.
+function blocoPrevisaoFixas(){
+  if(!fixas.length) return '';
+  const mes=mesAtual();
+  const visiveis=fixas.filter(f=>filter.unit==='all'||f.unit===filter.unit);
+  if(!visiveis.length) return '';
+  const previsto=visiveis.reduce((s,f)=>s+(f.valor||0),0);
+  const pago=visiveis.reduce((s,f)=>s+fixaPago(f,mes),0);
+  const falta=Math.max(0,previsto-pago);
+
+  let h=`<div class="rel-block"><div class="rel-head">📅 Previsão do mês (contas fixas)</div>`;
+  h+=visiveis.slice().sort((a,b)=>(a.dia||99)-(b.dia||99)).map(f=>{
+    const p=fixaPago(f,mes);
+    const quitada=p>=(f.valor||0)-0.005;
+    const parcial=p>0&&!quitada;
+    const cor=quitada?'var(--green)':(parcial?'var(--yellow)':'var(--muted)');
+    const status=quitada?'✓ pago':(parcial?`parcial ${fmt(p)}`:'a pagar');
+    return `<div class="rel-row">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0">
+        <div style="width:9px;height:9px;border-radius:50%;background:${getCat(f.cat).cor};flex-shrink:0"></div>
+        <div style="min-width:0"><div style="font-size:13px;font-weight:600">${esc(f.desc)}</div>
+        <div style="font-size:10px;color:var(--muted)">${getUnit(f.unit).name}${f.dia?' · dia '+f.dia:''}</div></div>
+      </div>
+      <div style="text-align:right"><div class="rel-val">${fmt(f.valor)}</div><div style="font-size:10px;color:${cor}">${status}</div></div>
+    </div>`;
+  }).join('');
+  h+=`<div class="rel-row" style="background:var(--s2)"><div class="rel-lbl" style="font-weight:700;color:var(--text)">Previsto no mês</div><div class="rel-val">${fmt(previsto)}</div></div>
+  <div class="rel-row"><div class="rel-lbl">Já pago</div><div class="rel-val" style="color:var(--green)">${fmt(pago)}</div></div>
+  <div class="rel-row"><div class="rel-lbl">Ainda a pagar</div><div class="rel-val" style="color:var(--yellow)">${fmt(falta)}</div></div></div>`;
+  return h;
+}
+
+// Despesas parceladas: quanto já foi pago e quanto falta de cada uma.
+function blocoCompromissos(){
+  const abertos=compromissos.filter(c=>!compQuitado(c)&&(filter.unit==='all'||c.unit===filter.unit));
+  if(!abertos.length) return '';
+  const totalFalta=abertos.reduce((s,c)=>s+compSaldo(c),0);
+  let h=`<div class="rel-block"><div class="rel-head">🧾 Despesas parceladas em aberto</div>`;
+  h+=abertos.map(c=>compRowHTML(c)).join('');
+  h+=`<div class="rel-row" style="background:var(--s2)"><div class="rel-lbl" style="font-weight:700;color:var(--text)">Total ainda a pagar</div><div class="rel-val" style="color:var(--yellow)">${fmt(totalFalta)}</div></div></div>`;
+  return h;
+}
+
+function compRowHTML(c){
+  const pago=compPago(c.id), falta=compSaldo(c);
+  const pct=c.valor_total>0?Math.min(100,Math.round((pago/c.valor_total)*100)):0;
+  const n=compPagamentos(c.id).length;
+  return `<div class="rel-row" style="display:block" onclick="openCompDetalhe('${c.id}')">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="min-width:0"><div style="font-size:13px;font-weight:600">${esc(c.desc)}</div>
+      <div style="font-size:10px;color:var(--muted)">${c.forn?esc(c.forn)+' · ':''}${n} pagamento${n===1?'':'s'} · ${getCat(c.cat).label}</div></div>
+      <div style="text-align:right;flex-shrink:0"><div class="rel-val" style="color:var(--yellow)">falta ${fmt(falta)}</div>
+      <div style="font-size:10px;color:var(--muted)">${fmt(pago)} de ${fmt(c.valor_total)}</div></div>
+    </div>
+    <div class="cat-bar-wrap" style="margin-top:8px"><div class="cat-bar" style="width:${pct}%;background:var(--yellow)"></div></div>
+  </div>`;
+}
+
+function openCompDetalhe(cid){
+  const c=getComp(cid); if(!c) return;
+  const pags=compPagamentos(cid).slice().sort((a,b)=>a.data.localeCompare(b.data));
+  const linhas=pags.map((l,i)=>`${i+1}ª parcela · ${fmtDateFull(l.data)} · ${fmt(l.valor)}`).join('\n');
+  alert(`${c.desc}\n${c.forn?'Fornecedor: '+c.forn+'\n':''}Total: ${fmt(c.valor_total)}\nPago: ${fmt(compPago(cid))}\nFalta: ${fmt(compSaldo(c))}\n\n${linhas||'Nenhum pagamento ainda.'}`);
+}
+
+// Totais separados por grupo (produção, operacional, retiradas, outros).
+function blocoGrupos(data,totalOut){
+  const saidas=data.filter(l=>l.tipo==='out');
+  if(!saidas.length) return '';
+  const tot={};
+  saidas.forEach(l=>{ const g=grupoDaCat(l.cat); tot[g.id]=(tot[g.id]||0)+(l.valor||0); });
+  const linhas=GRUPOS.filter(g=>tot[g.id]).map(g=>{
+    const v=tot[g.id], pct=totalOut>0?((v/totalOut)*100).toFixed(1):0;
+    return `<div class="rel-row">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:9px;height:9px;border-radius:50%;background:${g.cor};flex-shrink:0"></div>
+        <div><div style="font-size:13px;font-weight:600">${g.icon} ${g.label}</div><div style="font-size:10px;color:var(--muted)">${pct}% das saídas</div></div>
+      </div>
+      <div class="rel-val" style="color:var(--red)">${fmt(v)}</div>
+    </div>`;
+  }).join('');
+  return `<div class="rel-block"><div class="rel-head">🗂️ Totais por grupo</div>${linhas}</div>`;
+}
+
+// Retirada pessoal de cada sócio no período.
+function blocoSocios(data){
+  const linhas=socios.map((s,i)=>({s,i,v:data.filter(l=>l.tipo==='out'&&l.cat===catSocioId(s.id)).reduce((a,l)=>a+(l.valor||0),0)}))
+    .filter(x=>x.v>0);
+  if(!linhas.length) return '';
+  const total=linhas.reduce((a,x)=>a+x.v,0);
+  let h=`<div class="rel-block"><div class="rel-head">🙋 Retiradas por sócio</div>`;
+  h+=linhas.sort((a,b)=>b.v-a.v).map(({s,i,v})=>`<div class="rel-row">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:9px;height:9px;border-radius:50%;background:${SOCIO_CORES[i%SOCIO_CORES.length]};flex-shrink:0"></div>
+      <div style="font-size:13px;font-weight:600">${esc(s.name)}</div>
+    </div>
+    <div class="rel-val" style="color:var(--red)">${fmt(v)}</div>
+  </div>`).join('');
+  h+=`<div class="rel-row" style="background:var(--s2)"><div class="rel-lbl" style="font-weight:700;color:var(--text)">Total retirado</div><div class="rel-val" style="color:var(--red)">${fmt(total)}</div></div></div>`;
+  return h;
+}
+
+// Totais por fornecedor/beneficiário no período.
+function blocoFornecedores(data){
+  const porForn={};
+  data.filter(l=>l.tipo==='out'&&norm(l.forn)).forEach(l=>{
+    const k=norm(l.forn);
+    if(!porForn[k]) porForn[k]={nome:l.forn,valor:0,n:0};
+    porForn[k].valor+=(l.valor||0); porForn[k].n++;
+  });
+  const linhas=Object.values(porForn).sort((a,b)=>b.valor-a.valor);
+  if(!linhas.length) return '';
+  return `<div class="rel-block"><div class="rel-head">🚚 Por fornecedor / beneficiário</div>`
+    + linhas.map(f=>`<div class="rel-row">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:600">${esc(f.nome)}</div>
+        <div style="font-size:10px;color:var(--muted)">${f.n} pagamento${f.n===1?'':'s'}</div></div>
+        <div class="rel-val" style="color:var(--red)">${fmt(f.valor)}</div>
+      </div>`).join('')
+    + `</div>`;
+}
+
 // ══════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════
@@ -766,9 +1025,31 @@ function renderConfig(){
   <div class="lst">${units.map(u=>`
     <div class="row" onclick="openEditUnit('${u.id}')">
       <div class="row-ico" style="background:var(--s2)">${u.icon}</div>
-      <div class="row-info"><div class="row-name">${u.name}</div></div>
+      <div class="row-info"><div class="row-name">${esc(u.name)}</div></div>
       <div style="color:var(--muted)">›</div>
     </div>`).join('')}</div>
+
+  <div class="sh"><div class="st">Sócios</div><div class="sa" onclick="openAddSocio()">+ Novo</div></div>
+  <div style="font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.5">Cada sócio ganha uma categoria de retirada própria, para separar a despesa pessoal de cada um.</div>
+  <div class="lst">${socios.map((s,i)=>`
+    <div class="row" onclick="openEditSocio('${s.id}')">
+      <div class="row-ico" style="background:${SOCIO_CORES[i%SOCIO_CORES.length]}22">🙋</div>
+      <div class="row-info"><div class="row-name">${esc(s.name)}</div><div class="row-meta">Retirada no período: ${fmt(totalSocio(s.id))}</div></div>
+      <div style="color:var(--muted)">›</div>
+    </div>`).join('')}</div>
+
+  <div class="sh"><div class="st">Contas fixas mensais</div><div class="sa" onclick="openAddFixa()">+ Nova</div></div>
+  <div style="font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.5">Despesas que se repetem todo mês (aluguel, luz, funcionários, sistema). Servem para prever o mês no relatório.</div>
+  ${fixas.length?`<div class="lst">${fixas.map(f=>`
+    <div class="row" onclick="openEditFixa('${f.id}')">
+      <div class="row-ico" style="background:${getCat(f.cat).cor}22">${getCat(f.cat).icon}</div>
+      <div class="row-info">
+        <div class="row-name">${esc(f.desc)}</div>
+        <div class="row-meta">${getUnit(f.unit).icon} ${getUnit(f.unit).name} · ${getCat(f.cat).label}${f.dia?' · vence dia '+f.dia:''}</div>
+      </div>
+      <div class="row-right"><div class="row-val">${fmt(f.valor)}</div><div class="row-sub" style="color:var(--muted)">por mês</div></div>
+    </div>`).join('')}</div>`
+  :`<div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center;font-size:12px;color:var(--muted)">Nenhuma conta fixa cadastrada ainda.</div>`}
 
   <div class="sh"><div class="st">Maquininhas</div><div class="sa" onclick="openAddMaq()">+ Nova</div></div>
   <div class="lst">${maquinas.map(m=>`
@@ -782,7 +1063,7 @@ function renderConfig(){
     </div>`).join('')}</div>
 
   <div class="sh"><div class="st">Categorias de saída</div></div>
-  <div class="lst">${CAT_OUT.map(c=>`
+  <div class="lst">${catsOut().map(c=>`
     <div class="cat-row">
       <div class="cat-dot" style="background:${c.cor}"></div>
       <div class="cat-info"><div class="cat-name">${c.icon} ${c.label}</div></div>
@@ -793,6 +1074,29 @@ function renderConfig(){
     <button class="btn-p btn-del" style="margin-top:0" onclick="if(confirm('Apagar TODOS os lançamentos?')){lancamentos=[];save();renderPage(currentTab);showToast('🗑️','Dados apagados');}">🗑️ Apagar todos os lançamentos</button>
   </div>`;
   document.getElementById('cfg-content').innerHTML=html;
+}
+
+// ── SÓCIOS ──
+function totalSocio(sid){
+  return filterLanc(lancamentos).filter(l=>l.tipo==='out'&&l.cat===catSocioId(sid))
+    .reduce((s,l)=>s+(l.valor||0),0);
+}
+function openAddSocio(){
+  const name=prompt('Nome do sócio (ex: Theo):');
+  if(!name||!name.trim()) return;
+  socios.push({id:'s'+Date.now(),name:name.trim()});
+  save(); renderConfig(); showToast('✅','Sócio adicionado');
+}
+function openEditSocio(id){
+  const s=getSocio(id); if(!s) return;
+  const name=prompt('Nome do sócio (deixe vazio para excluir):',s.name);
+  if(name===null) return;
+  if(name.trim()){ s.name=name.trim(); save(); renderConfig(); showToast('✅','Sócio atualizado'); return; }
+  const usados=lancamentos.filter(l=>l.cat===catSocioId(id)).length;
+  if(usados){ showToast('⚠️',`${usados} lançamento(s) usam esse sócio`); return; }
+  if(confirm(`Excluir o sócio ${s.name}?`)){
+    socios=socios.filter(x=>x.id!==id); save(); renderConfig(); showToast('🗑️','Sócio removido');
+  }
 }
 
 function saveApiKey(){
@@ -839,22 +1143,54 @@ function openUnitPicker(){
 // MODAL LANÇAMENTO
 // ══════════════════════════════════════════════════
 function populateLancModal(tipo){
-  const cats = tipo==='in'?CAT_IN:CAT_OUT;
-  document.getElementById('l-cat').innerHTML=cats.map(c=>`<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
-  document.getElementById('l-maquina').innerHTML=maquinas.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
-  document.getElementById('l-unit').innerHTML=units.map(u=>`<option value="${u.id}">${u.icon} ${u.name}</option>`).join('');
+  const cats = tipo==='in'?CAT_IN:catsOut();
+  document.getElementById('l-cat').innerHTML=cats.map(c=>`<option value="${c.id}">${c.icon} ${esc(c.label)}</option>`).join('');
+  document.getElementById('l-maquina').innerHTML=maquinas.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  document.getElementById('l-unit').innerHTML=units.map(u=>`<option value="${u.id}">${u.icon} ${esc(u.name)}</option>`).join('');
+  populateCompSelect();
+  populateFixaSelect();
   document.getElementById('l-tipo').value=tipo;
   onTipoChange();
+}
+
+function populateCompSelect(){
+  const sel=document.getElementById('l-comp');
+  const cur=editingLancId ? (lancamentos.find(x=>x.id===editingLancId)||{}).comp_id : null;
+  const lista=[...compsAbertos()];
+  if(cur && !lista.some(c=>c.id===cur)){ const c=getComp(cur); if(c) lista.unshift(c); }
+  sel.innerHTML=`<option value="">Pagamento avulso (não é parcelado)</option>`
+    + lista.map(c=>`<option value="${c.id}">${esc(c.desc)} — falta ${fmt(compSaldo(c))} de ${fmt(c.valor_total)}</option>`).join('')
+    + `<option value="__new">➕ Criar nova despesa parcelada…</option>`;
+  sel.value=cur||'';
+}
+
+function populateFixaSelect(){
+  const sel=document.getElementById('l-fixa');
+  const cur=editingLancId ? (lancamentos.find(x=>x.id===editingLancId)||{}).fixa_id : null;
+  sel.innerHTML=`<option value="">— Nenhuma —</option>`
+    + fixas.map(f=>`<option value="${f.id}">${esc(f.desc)} · ${fmt(f.valor)}/mês</option>`).join('');
+  sel.value=cur||'';
+}
+
+function onCompChange(){
+  const isOut=document.getElementById('l-tipo').value==='out';
+  const v=document.getElementById('l-comp').value;
+  document.getElementById('l-comp-new-wrap').style.display=(isOut&&v==='__new')?'block':'none';
+  calcLancPreview();
 }
 
 function onTipoChange(){
   const tipo=document.getElementById('l-tipo').value;
   const isIn=tipo==='in';
-  const cats=isIn?CAT_IN:CAT_OUT;
+  const cats=isIn?CAT_IN:catsOut();
   document.getElementById('l-cat').innerHTML=cats.map(c=>`<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
   const showMaq=isIn;
   document.getElementById('l-maq-wrap').style.display=showMaq?'block':'none';
   document.getElementById('l-pagtype-wrap').style.display=showMaq?'block':'none';
+  document.getElementById('l-comp-wrap').style.display=isIn?'none':'block';
+  document.getElementById('l-fixa-wrap').style.display=isIn?'none':'block';
+  if(!isIn) populateCompSelect();
+  onCompChange();
   document.getElementById('l-save-btn').className='btn-p '+(isIn?'btn-green':'btn-red');
   calcLancPreview();
 }
@@ -865,8 +1201,24 @@ function calcLancPreview(){
   const isIn=tipo==='in';
   const pb=document.getElementById('l-preview');
   if(!val||val<=0){ pb.style.display='none'; return; }
-  if(!isIn){ pb.style.display='flex'; pb.className='preview-box out';
-    pb.innerHTML=`<div><div class="pb-lbl">Saída registrada</div></div><div class="pb-val out">${fmt(val)}</div>`; return; }
+  if(!isIn){
+    pb.style.display='flex'; pb.className='preview-box out';
+    const cv=document.getElementById('l-comp').value;
+    let extra='';
+    if(cv==='__new'){
+      const tot=parseFloat(document.getElementById('l-comp-total').value);
+      if(tot>0) extra=`<div class="pb-sub">Despesa de ${fmt(tot)} · ficará faltando ${fmt(Math.max(0,tot-val))}</div>`;
+    } else if(cv){
+      const c=getComp(cv);
+      if(c){
+        const antes=compPagoExcluindo(c.id,editingLancId);
+        const falta=Math.max(0,(c.valor_total||0)-antes-val);
+        extra=`<div class="pb-sub">${esc(c.desc)}: ${fmt(antes+val)} de ${fmt(c.valor_total)} · falta ${fmt(falta)}</div>`;
+      }
+    }
+    pb.innerHTML=`<div><div class="pb-lbl">Saída registrada</div>${extra}</div><div class="pb-val out">${fmt(val)}</div>`;
+    return;
+  }
   const pagtype=document.getElementById('l-pagtype').value;
   const maqId=document.getElementById('l-maquina').value;
   const maq=getMaq(maqId);
@@ -886,6 +1238,10 @@ function openLanc(tipo){
   document.getElementById('l-forn').value='';
   document.getElementById('l-obs').value='';
   document.getElementById('l-data').value=today();
+  document.getElementById('l-comp').value='';
+  document.getElementById('l-comp-total').value='';
+  document.getElementById('l-fixa').value='';
+  onCompChange();
   document.getElementById('l-del-btn').style.display='none';
   document.getElementById('l-preview').style.display='none';
   openMo('mo-lanc');
@@ -906,6 +1262,9 @@ function openEditLanc(id){
   document.getElementById('l-maquina').value=l.maq_id||maquinas[0]?.id||'';
   document.getElementById('l-pagtype').value=l.pagtype||'debito';
   document.getElementById('l-unit').value=l.unit||units[0]?.id||'';
+  document.getElementById('l-comp').value=l.comp_id||'';
+  document.getElementById('l-fixa').value=l.fixa_id||'';
+  onCompChange();
   document.getElementById('l-del-btn').style.display='block';
   if(l.img_b64) document.getElementById('mo-img-wrap').innerHTML=`<img class="rec-img" src="data:${l.img_mime};base64,${l.img_b64}"/>`;
   else document.getElementById('mo-img-wrap').innerHTML='';
@@ -924,6 +1283,23 @@ function saveLanc(){
   const liq=tipo==='in'?calcLiquido(val,pagtype,maq):val;
   const rec=tipo==='in'?calcDataRec(pagtype,maq):null;
   const unitId=document.getElementById('l-unit').value||units[0]?.id;
+  const desc=document.getElementById('l-desc').value||getCat(cat).label;
+  const forn=document.getElementById('l-forn').value;
+
+  // Vínculo com despesa parcelada (compromisso) e com conta fixa mensal.
+  let compId=null, fixaId=null, novoComp=null;
+  if(tipo==='out'){
+    const cv=document.getElementById('l-comp').value;
+    if(cv==='__new'){
+      const tot=parseFloat(document.getElementById('l-comp-total').value);
+      if(!tot||tot<=0){ showToast('⚠️','Informe o valor total da despesa'); return; }
+      if(tot<val){ showToast('⚠️','Valor total menor que este pagamento'); return; }
+      novoComp={id:'c'+Date.now(),desc,valor_total:tot,cat,forn,unit:unitId,criado:today()};
+      compId=novoComp.id;
+    } else if(cv) compId=cv;
+    fixaId=document.getElementById('l-fixa').value||null;
+  }
+
   const entry={
     id:editingLancId||Date.now()+'',
     tipo, cat, val_bruto:tipo==='in'?val:null,
@@ -932,11 +1308,13 @@ function saveLanc(){
     pagtype:tipo==='in'?pagtype:null,
     data:document.getElementById('l-data').value||today(),
     data_rec:rec,
-    desc:document.getElementById('l-desc').value||getCat(cat).label,
-    forn:document.getElementById('l-forn').value,
+    desc, forn,
     obs:document.getElementById('l-obs').value,
     unit:unitId,
+    comp_id:compId,
+    fixa_id:fixaId,
   };
+  if(novoComp) compromissos.push(novoComp);
   if(editingLancId){
     // preserve image
     const old=lancamentos.find(x=>x.id===editingLancId);
@@ -955,6 +1333,64 @@ function deleteLanc(){
   lancamentos=lancamentos.filter(x=>x.id!==editingLancId);
   save(); closeMo('mo-lanc'); renderPage(currentTab);
   showToast('🗑️','Lançamento removido');
+}
+
+// ══════════════════════════════════════════════════
+// MODAL CONTA FIXA
+// ══════════════════════════════════════════════════
+function populateFixaModal(){
+  document.getElementById('fx-cat').innerHTML=catsOut().map(c=>`<option value="${c.id}">${c.icon} ${esc(c.label)}</option>`).join('');
+  document.getElementById('fx-unit').innerHTML=units.map(u=>`<option value="${u.id}">${u.icon} ${esc(u.name)}</option>`).join('');
+}
+function openAddFixa(){
+  editingFixaId=null;
+  populateFixaModal();
+  document.getElementById('mo-fixa-title').textContent='Nova Conta Fixa';
+  document.getElementById('fx-desc').value='';
+  document.getElementById('fx-valor').value='';
+  document.getElementById('fx-dia').value='';
+  document.getElementById('fx-cat').value='aluguel';
+  document.getElementById('fx-del-btn').style.display='none';
+  openMo('mo-fixa');
+}
+function openEditFixa(id){
+  const f=getFixa(id); if(!f) return;
+  editingFixaId=id;
+  populateFixaModal();
+  document.getElementById('mo-fixa-title').textContent='Editar Conta Fixa';
+  document.getElementById('fx-desc').value=f.desc||'';
+  document.getElementById('fx-valor').value=f.valor||'';
+  document.getElementById('fx-dia').value=f.dia||'';
+  document.getElementById('fx-cat').value=f.cat;
+  document.getElementById('fx-unit').value=f.unit;
+  document.getElementById('fx-del-btn').style.display='block';
+  openMo('mo-fixa');
+}
+function saveFixa(){
+  const desc=document.getElementById('fx-desc').value.trim();
+  const valor=parseFloat(document.getElementById('fx-valor').value);
+  if(!desc){ showToast('⚠️','Informe a descrição'); return; }
+  if(!valor||valor<=0){ showToast('⚠️','Informe o valor mensal'); return; }
+  const dia=parseInt(document.getElementById('fx-dia').value);
+  const data={
+    id:editingFixaId||'f'+Date.now(),
+    desc, valor,
+    dia:(dia>=1&&dia<=31)?dia:null,
+    cat:document.getElementById('fx-cat').value,
+    unit:document.getElementById('fx-unit').value,
+  };
+  if(editingFixaId) fixas=fixas.map(f=>f.id===editingFixaId?data:f);
+  else fixas.push(data);
+  save(); closeMo('mo-fixa'); renderPage(currentTab);
+  showToast('✅',editingFixaId?'Conta fixa atualizada':'Conta fixa criada');
+}
+function deleteFixa(){
+  if(!editingFixaId) return;
+  if(!confirm('Excluir esta conta fixa?')) return;
+  fixas=fixas.filter(f=>f.id!==editingFixaId);
+  lancamentos.forEach(l=>{ if(l.fixa_id===editingFixaId) l.fixa_id=null; });
+  save(); closeMo('mo-fixa'); renderPage(currentTab);
+  showToast('🗑️','Conta fixa removida');
 }
 
 // ══════════════════════════════════════════════════
@@ -1029,14 +1465,14 @@ function setUploadType(t){
   document.getElementById('upzone-title').textContent=t==='in'?'Foto do comprovante':'Foto da nota/recibo';
   document.getElementById('upzone-sub').textContent=t==='in'
     ?'Toque para abrir câmera ou galeria.\nA IA lê e registra tudo automaticamente.'
-    :'Fotografe nota fiscal, recibo ou comprovante de despesa.\nA IA identifica valor, categoria e fornecedor.';
+    :'Fotografe nota, comprovante bancário ou até uma anotação escrita à mão com nome e valor.\nA IA identifica valor, categoria e fornecedor.';
   renderAiTips();
 }
 
 function renderAiTips(){
   const tips=uploadType==='in'
     ?['Valor bruto da transação','Tipo: débito, crédito, PIX','Qual maquininha foi usada','Data da venda']
-    :['Valor da despesa','Categoria (tecido, funcionários, etc.)','Nome do fornecedor/beneficiário','Data do pagamento'];
+    :['Valor da despesa','Categoria (tecido, funcionários, etc.)','Nome do fornecedor/beneficiário','Data do pagamento','Se é parcela de uma despesa maior já registrada'];
   document.getElementById('ai-tips-list').innerHTML=tips.map(t=>
     `<div style="display:flex;gap:10px;margin-bottom:8px;font-size:12px;color:var(--muted)"><span style="color:var(--green);font-weight:700">✓</span>${t}</div>`
   ).join('');
@@ -1044,8 +1480,12 @@ function renderAiTips(){
 
 async function lerImagem(base64, mimeType, tipo){
   const listaMaq=maquinas.map(m=>`- ${m.name} (id:${m.id})`).join('\n');
-  const listaCatOut=CAT_OUT.map(c=>`- ${c.id}: ${c.label}`).join('\n');
+  const listaCatOut=catsOut().map(c=>`- ${c.id}: ${c.label}`).join('\n');
   const listaCatIn=CAT_IN.map(c=>`- ${c.id}: ${c.label}`).join('\n');
+  const abertos=compsAbertos();
+  const listaComp=abertos.length
+    ? abertos.map(c=>`- id:${c.id} | ${c.desc} | fornecedor: ${c.forn||'não informado'} | total ${fmt(c.valor_total)} | já pago ${fmt(compPago(c.id))} | falta ${fmt(compSaldo(c))}`).join('\n')
+    : '(nenhuma)';
 
   const promptIn=`Você é um extrator de dados financeiros brasileiro. Analise este comprovante de recebimento de maquininha de cartão.
 
@@ -1057,15 +1497,31 @@ ${listaCatIn}
 Retorne APENAS JSON:
 {"valor":número,"tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix","maquina_id":"id","cat":"id_categoria","desc":"descrição curta","data":"YYYY-MM-DD ou null"}`;
 
-  const promptOut=`Você é um extrator de dados financeiros brasileiro. Analise esta imagem de despesa (nota fiscal, recibo, comprovante de pagamento).
+  const promptOut=`Você é um extrator de dados financeiros brasileiro. Analise esta imagem de comprovante de despesa de uma confecção de roupa feminina com várias lojas.
+
+A imagem pode ser de formatos bem diferentes, todos válidos:
+- Nota fiscal ou recibo formal
+- Print de comprovante de pagamento/PIX do aplicativo do banco
+- Uma anotação manuscrita simples, só com o nome da pessoa/empresa e o valor, sem nenhum comprovante formal
+- Boleto ou conta de consumo (luz, água, telefone)
 
 Categorias de saída disponíveis:
 ${listaCatOut}
 
-Retorne APENAS JSON:
-{"valor":número,"cat":"id_categoria_mais_provavel","desc":"descrição curta do que é","forn":"nome fornecedor ou null","data":"YYYY-MM-DD ou null"}
+Se a categoria não ficar clara pelo conteúdo, use "outros_out". As categorias que começam com "pessoal_" são retiradas pessoais de cada sócio — use apenas quando o comprovante indicar claramente o nome daquele sócio ou que é despesa pessoal dele.
 
-Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionarios"; conta de luz → cat:"energia"; nota de costureira → cat:"confeccao"`;
+Despesas parceladas já em aberto (pagamentos anteriores registrados):
+${listaComp}
+
+Este pagamento pode ser uma PARCELA de uma despesa maior. Preste atenção em indícios como "1ª parcela", "sinal", "entrada", "restante", "saldo", ou o mesmo fornecedor de uma despesa em aberto acima.
+- Se o comprovante se refere claramente a uma das despesas em aberto listadas, devolva o id dela em "comp_id".
+- Se o comprovante indica que este pagamento é parte de um total maior que ainda não está na lista, devolva esse total em "valor_total".
+- Se é um pagamento único e completo, devolva ambos como null.
+
+Retorne APENAS JSON:
+{"valor":número_deste_pagamento,"cat":"id_categoria_mais_provavel","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null","comp_id":"id_da_despesa_em_aberto ou null","valor_total":número_total_da_despesa_ou_null}
+
+Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionarios"; conta de luz → cat:"energia"; nota de costureira → cat:"confeccao"; anotação manuscrita "Maria - R$300" sem mais contexto → cat:"outros_out", forn:"Maria"; recibo "2ª parcela costureira Ana, R$300 de R$1000" → valor:300, forn:"Ana", valor_total:1000`;
 
   const prompt=tipo==='in'?promptIn:promptOut;
 
@@ -1135,20 +1591,36 @@ async function handleFiles(files){
           img_b64:base64,img_mime:file.type,
         };
       } else {
+        const cat=res.cat||'outros_out';
+        const unitId=units[0]?.id;
+        // Vincula a uma despesa parcelada: pelo id que a IA identificou, senão
+        // por fornecedor compatível, senão cria uma nova se veio um valor total.
+        let comp=res.comp_id?getComp(res.comp_id):null;
+        if(comp&&compQuitado(comp)) comp=null;
+        if(!comp) comp=acharCompPorForn(res.forn);
+        if(!comp&&res.valor_total&&res.valor_total>res.valor+0.005){
+          comp={id:'c'+Date.now()+Math.floor(Math.random()*1000),
+            desc:res.desc||getCat(cat).label,valor_total:res.valor_total,
+            cat,forn:res.forn,unit:unitId,criado:today()};
+          compromissos.push(comp);
+        }
         entry={
           id:Date.now()+Math.random()+'',tipo:'out',
-          cat:res.cat||'outros_out',
+          cat,
           valor:res.valor,valor_liquido:res.valor,
           data:res.data||today(),
-          desc:res.desc||getCat(res.cat||'outros_out').label,
+          desc:res.desc||getCat(cat).label,
           forn:res.forn,
-          unit:units[0]?.id,
+          unit:unitId,
+          comp_id:comp?comp.id:null,
           img_b64:base64,img_mime:file.type,
         };
       }
       lancamentos.unshift(entry);
       save();
-      showToast('✅',`${fmt(res.valor)} registrado!`);
+      const vinc=entry.comp_id?getComp(entry.comp_id):null;
+      if(vinc) showToast('🧾',`${fmt(res.valor)} em ${vinc.desc} · falta ${fmt(compSaldo(vinc))}`);
+      else showToast('✅',`${fmt(res.valor)} registrado!`);
     } catch(e){ showToast('❌',`Erro: ${e.message}`); }
   }
 
