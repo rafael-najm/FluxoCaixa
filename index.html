@@ -198,6 +198,12 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 .rev-badge.warn{background:var(--yellow-d);color:var(--yellow);}
 .rev-duv{font-size:11px;color:var(--yellow);margin-top:4px;line-height:1.4;}
 .rev-duv-box{background:var(--yellow-d);border:1px solid rgba(255,209,102,.25);border-radius:13px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--yellow);line-height:1.6;}
+.rev-src{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.4px;border-radius:6px;padding:2px 6px;margin-top:5px;margin-right:5px;background:var(--blue-d);color:var(--blue);text-transform:uppercase;}
+
+/* ── EXTRATO ── */
+.ex-stat{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.ex-stat:last-child{border-bottom:none;}
+.ex-num{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:15px;}
 </style>
 </head>
 <body>
@@ -230,6 +236,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 
 <button class="fab-main" id="fab-main" onclick="pickFiles()">+<span class="fab-badge hidden" id="fab-badge"></span></button>
 <input type="file" id="file-in" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files);this.value=''"/>
+<input type="file" id="file-extrato" accept=".ofx,.csv,.txt,text/plain,text/csv,application/x-ofx" style="display:none" onchange="extratoDeArquivo(this.files);this.value=''"/>
+<input type="file" id="file-extrato-img" accept="image/*" multiple style="display:none" onchange="extratoDeFoto(this.files);this.value=''"/>
 
 <!-- PROCESSING -->
 <div class="proc-ov hidden" id="proc-ov">
@@ -344,6 +352,29 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
   </div>
 </div>
 
+<!-- MODAL EXTRATO -->
+<div class="mo" id="mo-extrato">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">Conferir extrato bancário</div>
+    <div class="mb">
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px">
+        Comparo os débitos do banco com o que já está lançado e mostro o que ficou de fora — tarifa, pedágio, débito pequeno no cartão.
+      </div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="pickExtratoArquivo()">📁 Escolher arquivo (OFX ou CSV)</button>
+      <button class="btn-p btn-ghost" onclick="pickExtratoFoto()">📷 Foto ou print do extrato</button>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Ou cole o extrato aqui</label>
+        <textarea id="ex-texto" placeholder="Cole as linhas do extrato (data, histórico e valor)" style="min-height:110px"></textarea>
+      </div>
+      <button class="btn-p btn-ghost" style="margin-top:0" onclick="extratoDeTexto()">Conferir o texto colado</button>
+      <div id="ex-resultado"></div>
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-extrato')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONTA FIXA -->
 <div class="mo" id="mo-fixa">
   <div class="ms">
@@ -379,6 +410,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 // ══════════════════════════════════════════════════
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
 const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1', SK_R = 'fc_revisao_v1';
+const SK_EX = 'fc_extrato_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
 const CAT_IN = [
@@ -399,6 +431,8 @@ const CAT_OUT = [
   {id:'manutencao',   label:'Manutenção',       icon:'🔧', cor:'#94A3B8'},
   {id:'sistema',      label:'Sistema/Software',  icon:'💻', cor:'#38BDF8'},
   {id:'impostos',     label:'Impostos/Taxas',   icon:'📄', cor:'#F87171'},
+  {id:'tarifas',      label:'Tarifas bancárias',icon:'🏦', cor:'#FCA5A5'},
+  {id:'transporte',   label:'Combustível/Pedágio',icon:'⛽',cor:'#7DD3FC'},
   {id:'outros_out',   label:'Outros Gastos',    icon:'📌', cor:'#CBD5E1'},
 ];
 // Categoria legada: lançamentos antigos que usavam uma única categoria pessoal.
@@ -416,7 +450,7 @@ function allCats(){ return [...CAT_IN, ...catsOut(), ...LEGACY_CATS]; }
 // Agrupamento das saídas para totais separados no fim do período.
 const GRUPOS = [
   {id:'producao',   label:'Produção / Fornecedores', icon:'🏭', cor:'#A78BFA', cats:['tecido','aviamentos','confeccao','frete','embalagens']},
-  {id:'operacional',label:'Operacional / Fixas',     icon:'🏢', cor:'#FB923C', cats:['aluguel','energia','funcionarios','impostos','manutencao','marketing','sistema']},
+  {id:'operacional',label:'Operacional / Fixas',     icon:'🏢', cor:'#FB923C', cats:['aluguel','energia','funcionarios','impostos','manutencao','marketing','sistema','tarifas','transporte']},
   {id:'pessoal',    label:'Retiradas dos sócios',    icon:'🙋', cor:'#F472B6', cats:[], socios:true},
   {id:'outros',     label:'Outros',                  icon:'📌', cor:'#CBD5E1', cats:['outros_out']},
 ];
@@ -456,6 +490,9 @@ let compromissos = JSON.parse(localStorage.getItem(SK_C)||'[]');
 let fixas    = JSON.parse(localStorage.getItem(SK_FX)||'[]');
 // Fila da remessa da noite: fica salva para não perder nada se ele fechar o app.
 let revisao  = JSON.parse(localStorage.getItem(SK_R)||'[]');
+// Linhas de extrato já resolvidas (lançadas ou ignoradas), para não perguntar de novo
+// quando ele importar um extrato com período sobreposto.
+let extratoVistos = JSON.parse(localStorage.getItem(SK_EX)||'{}');
 
 let currentTab = 'home';
 let uploadType = 'auto';
@@ -476,6 +513,7 @@ function save(){
     localStorage.setItem(SK_C,JSON.stringify(compromissos));
     localStorage.setItem(SK_FX,JSON.stringify(fixas));
     localStorage.setItem(SK_R,JSON.stringify(revisao));
+    localStorage.setItem(SK_EX,JSON.stringify(extratoVistos));
     return true;
   }catch(e){
     // Última tentativa: grava tudo sem as fotos, que é o que ocupa espaço.
@@ -1616,6 +1654,178 @@ function deleteMaq(){
 }
 
 // ══════════════════════════════════════════════════
+// EXTRATO BANCÁRIO
+// ══════════════════════════════════════════════════
+// Valores de banco vêm como "1.234,56" (BR) ou "1234.56" (EN).
+function parseValorBR(s){
+  if(typeof s==='number') return s;
+  let t=(s||'').toString().trim().replace(/\s|R\$| /g,'');
+  if(!t) return NaN;
+  let neg=/^-/.test(t)||/\)$/.test(t)||/-$/.test(t);
+  t=t.replace(/[()]/g,'').replace(/-/g,'');
+  const temP=t.includes('.'), temV=t.includes(',');
+  if(temP&&temV){
+    // O separador decimal é o último que aparece.
+    t = t.lastIndexOf(',')>t.lastIndexOf('.')
+      ? t.replace(/\./g,'').replace(',','.')
+      : t.replace(/,/g,'');
+  } else if(temV){
+    t=t.replace(',','.');
+  } else if(temP){
+    // "1.234" é milhar; "45.90" é decimal.
+    const dec=t.split('.').pop();
+    if(dec.length===3) t=t.replace(/\./g,'');
+  }
+  const v=parseFloat(t);
+  return isNaN(v)?NaN:(neg?-v:v);
+}
+
+function parseDataBR(s){
+  const t=(s||'').toString().trim();
+  let m=t.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m=t.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
+  if(m){
+    let [,d,mo,y]=m;
+    if(y.length===2) y='20'+y;
+    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  m=t.match(/^(\d{4})(\d{2})(\d{2})/); // OFX: 20260715120000
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+
+// OFX é o formato que quase todo banco brasileiro exporta.
+function parseOFX(txt){
+  const out=[];
+  const blocos=txt.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi)||[];
+  const tag=(b,t)=>{
+    // Em OFX as tags de valor costumam vir sem fechamento.
+    const m=b.match(new RegExp('<'+t+'>([^<\\r\\n]*)','i'));
+    return m?m[1].trim():'';
+  };
+  blocos.forEach(b=>{
+    const valor=parseValorBR(tag(b,'TRNAMT'));
+    const data=parseDataBR(tag(b,'DTPOSTED'));
+    if(isNaN(valor)||!data) return;
+    const memo=(tag(b,'MEMO')||tag(b,'NAME')||'').trim();
+    const tt=tag(b,'TRNTYPE').toUpperCase();
+    out.push({data,valor,memo,tipo:(valor<0||tt==='DEBIT')?'D':'C'});
+  });
+  return out;
+}
+
+const eNumerico = c => /^[-+(]?\s*R?\$?\s*[\d.,]+\s*[)]?[-+]?$/.test(c) && /\d/.test(c);
+
+// Uma linha de extrato: acha a data, o valor e o histórico entre as colunas.
+// A primeira coluna numérica depois da data é o valor; as seguintes (saldo)
+// são descartadas, para não virarem descrição quando o histórico é curto.
+function parseLinhaExtrato(cols, linhaOriginal){
+  let data=null, valor=NaN;
+  const textos=[];
+  for(const c of cols){
+    if(!c) continue;
+    if(!data && /\d{1,4}[\/.-]\d{1,2}/.test(c)){
+      const d=parseDataBR(c);
+      if(d){ data=d; continue; }
+    }
+    if(eNumerico(c)){
+      const v=parseValorBR(c);
+      if(!isNaN(v) && isNaN(valor)) valor=v;
+      continue;
+    }
+    if(c.trim().length>2) textos.push(c.trim());
+  }
+  if(!data||isNaN(valor)||valor===0) return null;
+  // Alguns bancos não usam sinal e marcam a natureza numa coluna D/C.
+  const marcaD=/(^|[;,\t\s])D([;,\t\s]|$)|d[ée]bito/i.test(linhaOriginal||'');
+  const memo=textos.sort((a,b)=>b.length-a.length)[0]||'';
+  return {data,valor,memo,tipo:(valor<0||marcaD)?'D':'C'};
+}
+
+// O layout varia muito entre bancos (e entre arquivo e texto colado), então
+// testamos os separadores possíveis e ficamos com o que decifrar mais linhas.
+function parseCSVExtrato(txt){
+  const linhas=txt.split(/\r?\n/).filter(l=>l.trim());
+  // A vírgula fica por último: em valor brasileiro ela é o decimal, e usá-la
+  // como separador partiria "-1,23" em "-1" e "23". Só vence se decifrar mais
+  // linhas que as outras opções.
+  const separadores=[/;/, /\t/, /\s{2,}/, /,/];
+  let melhor=[];
+  for(const sep of separadores){
+    const out=[];
+    linhas.forEach(linha=>{
+      const cols=linha.split(sep).map(c=>c.replace(/^"|"$/g,'').trim());
+      if(cols.length<2) return;
+      const r=parseLinhaExtrato(cols,linha);
+      if(r) out.push(r);
+    });
+    if(out.length>melhor.length) melhor=out;
+  }
+  // Último recurso: linha separada por espaço simples, extraída por regex.
+  if(!melhor.length){
+    linhas.forEach(linha=>{
+      const md=linha.match(/\d{1,4}[\/.-]\d{1,2}[\/.-]\d{2,4}/);
+      const mv=linha.match(/[-+]?\s*R?\$?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}|[-+]?\s*R?\$?\s*\d+\.\d{2}\b/g);
+      if(!md||!mv) return;
+      const data=parseDataBR(md[0]);
+      const valor=parseValorBR(mv[0]);
+      if(!data||isNaN(valor)||valor===0) return;
+      const memo=linha.replace(md[0],'').replace(mv[0],'').replace(/\s{2,}/g,' ').trim();
+      const marcaD=/d[ée]bito/i.test(linha)||valor<0;
+      melhor.push({data,valor,memo,tipo:marcaD?'D':'C'});
+    });
+  }
+  return melhor;
+}
+
+function parseExtrato(txt){
+  if(/<STMTTRN>/i.test(txt)) return parseOFX(txt);
+  return parseCSVExtrato(txt);
+}
+
+// Identidade da linha, para não perguntar duas vezes sobre o mesmo débito.
+function fpLinha(l){
+  return l.data+'|'+Math.abs(l.valor).toFixed(2)+'|'+norm(l.memo).replace(/[^a-z0-9]/g,'').slice(0,28);
+}
+
+// Cruza os débitos do extrato com o que já está lançado (e com a fila de revisão).
+// Casa por valor igual e data próxima, e cada lançamento só serve para uma linha.
+function conciliar(linhas, janelaDias){
+  const jan=janelaDias==null?4:janelaDias;
+  const debitos=linhas.filter(l=>l.tipo==='D'&&Math.abs(l.valor)>0);
+  const usados=new Set();
+  const candidatos=[
+    ...lancamentos.filter(l=>l.tipo==='out').map(l=>({id:'L'+l.id,data:l.data,valor:l.valor,ref:l,onde:'lancamento'})),
+    ...revisao.filter(r=>r.tipo==='out'&&r.valor).map(r=>({id:'R'+r.rid,data:r.data,valor:r.valor,ref:r,onde:'revisao'})),
+  ];
+  const casados=[], novos=[], jaVistos=[];
+
+  debitos.forEach(l=>{
+    const fp=fpLinha(l);
+    if(extratoVistos[fp]){ jaVistos.push({linha:l,decisao:extratoVistos[fp]}); return; }
+    const alvo=Math.abs(l.valor);
+    const opts=candidatos
+      .filter(c=>!usados.has(c.id) && Math.abs(c.valor-alvo)<0.005)
+      .map(c=>({c,dist:Math.abs(diasEntre(c.data,l.data))}))
+      .filter(x=>x.dist<=jan)
+      .sort((a,b)=>a.dist-b.dist);
+    if(opts.length){
+      usados.add(opts[0].c.id);
+      casados.push({linha:l,alvo:opts[0].c});
+    } else {
+      novos.push({linha:l,fp});
+    }
+  });
+  return {casados,novos,jaVistos,totalDebitos:debitos.length};
+}
+
+function diasEntre(a,b){
+  const da=new Date(a+'T00:00:00'), db=new Date(b+'T00:00:00');
+  return Math.round((da-db)/86400000);
+}
+
+// ══════════════════════════════════════════════════
 // UPLOAD + AI
 // ══════════════════════════════════════════════════
 const AI_TIPS=[
@@ -1630,6 +1840,83 @@ function aiTipsHTML(){
   return AI_TIPS.map(t=>
     `<div style="display:flex;gap:10px;margin-bottom:8px;font-size:12px;color:var(--muted)"><span style="color:var(--green);font-weight:700">✓</span>${t}</div>`
   ).join('');
+}
+
+// Chamada de texto ao modelo (sem imagem), usada para classificar os débitos.
+async function chamarIA(prompt, maxTokens){
+  const apiKey=localStorage.getItem(SK_KEY);
+  if(!apiKey) throw new Error('Configure a chave de API em Config');
+  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+      'HTTP-Referer':location.origin,'X-Title':'FluxoCaixa'},
+    body:JSON.stringify({model:OR_MODEL,max_tokens:maxTokens||1500,
+      messages:[{role:'user',content:prompt}]})
+  });
+  const data=await r.json();
+  if(data.error) throw new Error(data.error.message||'Erro na API');
+  const txt=(data.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
+  const m=txt.match(/[\[{][\s\S]*[\]}]/);
+  if(!m) throw new Error('Resposta da IA ilegível');
+  return JSON.parse(m[0]);
+}
+
+// Classifica de uma vez todos os débitos não identificados, pelo histórico do extrato.
+async function classificarDebitos(itens){
+  const listaCatOut=catsOut().map(c=>`- ${c.id}: ${c.label}`).join('\n');
+  const lista=itens.map((x,i)=>`${i}: ${fmt(Math.abs(x.linha.valor))} em ${fmtDateFull(x.linha.data)} — "${x.linha.memo||'sem descrição'}"`).join('\n');
+  const prompt=`Você classifica lançamentos de extrato bancário de uma confecção de roupa feminina que também tem lojas.
+
+Estes débitos apareceram no extrato e ainda não estão registrados. Para cada um, diga a categoria mais provável e uma descrição curta em português, a partir do histórico do banco.
+
+Categorias:
+${listaCatOut}
+
+Débitos:
+${lista}
+
+Dicas: "TARIFA", "CESTA DE SERVICOS", "IOF", "ANUIDADE" → tarifas. "PEDAGIO", "SEM PARAR", "POSTO", "COMBUSTIVEL", "UBER" → transporte. "DAS", "DARF", "GPS", "FGTS", "INSS" → impostos. "ENERGIA", "CEMIG", "SABESP", "VIVO", "CLARO" → energia. Nome de pessoa física sem mais contexto → outros_out.
+Se não tiver como saber, use "outros_out" e deixe a dúvida em "duvida".
+
+Retorne APENAS um array JSON, um objeto por débito, na mesma ordem e com o índice:
+[{"i":0,"cat":"id_categoria","desc":"descrição curta","forn":"nome do beneficiário ou null","duvida":"o que ficou incerto ou null"}]`;
+  return await chamarIA(prompt, 2000);
+}
+
+// Print/foto do extrato: a IA devolve as linhas, para quem não consegue exportar arquivo.
+async function lerExtratoImagem(base64){
+  const apiKey=localStorage.getItem(SK_KEY);
+  if(!apiKey) throw new Error('Configure a chave de API em Config');
+  const prompt=`Esta imagem é um extrato bancário ou uma lista de transações. Extraia TODAS as linhas visíveis.
+
+Para cada linha devolva a data, o valor absoluto, o histórico exatamente como aparece, e se é débito (saiu dinheiro) ou crédito (entrou).
+
+Não invente linhas e não deixe nenhuma de fora. Se a data não aparecer na linha, use a data do agrupamento acima dela.
+
+Retorne APENAS JSON:
+{"linhas":[{"data":"YYYY-MM-DD","valor":número_positivo,"memo":"histórico","tipo":"D"|"C"}]}`;
+  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+      'HTTP-Referer':location.origin,'X-Title':'FluxoCaixa'},
+    body:JSON.stringify({model:OR_MODEL,max_tokens:3000,
+      messages:[{role:'user',content:[
+        {type:'text',text:prompt},
+        {type:'image_url',image_url:{url:'data:image/jpeg;base64,'+base64}}
+      ]}]})
+  });
+  const data=await r.json();
+  if(data.error) throw new Error(data.error.message||'Erro na API');
+  const txt=(data.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
+  const m=txt.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error('Não consegui ler o extrato da imagem');
+  const j=JSON.parse(m[0]);
+  return (j.linhas||[]).map(l=>({
+    data:parseDataBR(l.data)||today(),
+    valor:Math.abs(parseValorBR(l.valor)),
+    memo:l.memo||'',
+    tipo:l.tipo==='C'?'C':'D',
+  })).filter(l=>!isNaN(l.valor)&&l.valor>0);
 }
 
 async function lerImagem(base64, mimeType, tipoHint){
@@ -1790,6 +2077,149 @@ async function handleFiles(files){
 }
 
 // ══════════════════════════════════════════════════
+// CONCILIAÇÃO DO EXTRATO
+// ══════════════════════════════════════════════════
+let ultimaConciliacao=null;
+
+function openExtrato(){
+  document.getElementById('ex-texto').value='';
+  document.getElementById('ex-resultado').innerHTML='';
+  openMo('mo-extrato');
+}
+
+function pickExtratoArquivo(){ document.getElementById('file-extrato').click(); }
+function pickExtratoFoto(){ document.getElementById('file-extrato-img').click(); }
+
+async function extratoDeArquivo(files){
+  const f=files&&files[0]; if(!f) return;
+  try{
+    const txt=await f.text();
+    processarExtrato(parseExtrato(txt), f.name);
+  }catch(e){ showToast('❌','Não consegui ler o arquivo: '+e.message); }
+}
+
+async function extratoDeFoto(files){
+  const arr=Array.from(files||[]); if(!arr.length) return;
+  const ov=document.getElementById('proc-ov');
+  const tit=document.querySelector('.proc-title');
+  const sub=document.getElementById('proc-sub');
+  ov.classList.remove('hidden');
+  tit.textContent='Lendo o extrato...';
+  try{
+    let linhas=[];
+    for(let i=0;i<arr.length;i++){
+      sub.textContent=`imagem ${i+1} de ${arr.length}`;
+      const b64=await resizeImg(arr[i],1600,0.85);
+      linhas=linhas.concat(await lerExtratoImagem(b64));
+    }
+    processarExtrato(linhas,'foto do extrato');
+  }catch(e){
+    showToast('❌','Erro ao ler o extrato: '+e.message);
+  }finally{
+    ov.classList.add('hidden'); tit.textContent='Lendo com IA...';
+  }
+}
+
+function extratoDeTexto(){
+  const txt=document.getElementById('ex-texto').value.trim();
+  if(!txt){ showToast('⚠️','Cole o extrato no campo'); return; }
+  processarExtrato(parseExtrato(txt),'texto colado');
+}
+
+function processarExtrato(linhas, origem){
+  if(!linhas||!linhas.length){
+    showToast('⚠️','Não encontrei transações nesse extrato');
+    return;
+  }
+  // Se o extrato não marca os débitos (sem sinal e sem coluna D/C), não há o que
+  // conciliar — melhor dizer isso do que mostrar "tudo em ordem" sem ter olhado.
+  if(!linhas.some(l=>l.tipo==='D')){
+    document.getElementById('ex-resultado').innerHTML=
+      `<div class="divider"></div>
+       <div class="rev-duv-box">Li ${linhas.length} transação(ões), mas nenhuma aparece como débito — esse extrato não indica o que saiu.<br/>Tente a opção de foto/print, que identifica entrada e saída.</div>`;
+    showToast('⚠️','Nenhum débito identificado nesse formato');
+    return;
+  }
+  const r=conciliar(linhas);
+  ultimaConciliacao=r;
+  const el=document.getElementById('ex-resultado');
+  el.innerHTML=`
+    <div class="divider"></div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:10px">📄 ${esc(origem)} · ${linhas.length} transações lidas</div>
+    <div class="ex-stat"><div>Débitos no extrato</div><div class="ex-num">${r.totalDebitos}</div></div>
+    <div class="ex-stat"><div>✓ Já lançados</div><div class="ex-num" style="color:var(--green)">${r.casados.length}</div></div>
+    <div class="ex-stat"><div>⚠️ Não identificados</div><div class="ex-num" style="color:var(--yellow)">${r.novos.length}</div></div>
+    ${r.jaVistos.length?`<div class="ex-stat"><div style="color:var(--muted)">Já resolvidos antes</div><div class="ex-num" style="color:var(--muted)">${r.jaVistos.length}</div></div>`:''}
+    ${r.novos.length?`
+      <div style="font-size:11px;color:var(--muted);margin:12px 0;line-height:1.5">Esses débitos estão no banco mas não no app. Vou colocá-los na sua lista de conferência com a categoria já sugerida.</div>
+      <div class="lst" style="margin-bottom:12px">${r.novos.slice(0,8).map(n=>`
+        <div class="row">
+          <div class="row-ico" style="background:var(--yellow-d)">🏦</div>
+          <div class="row-info"><div class="row-name">${esc(n.linha.memo||'Sem descrição')}</div>
+          <div class="row-meta">${fmtDateFull(n.linha.data)}</div></div>
+          <div class="row-right"><div class="row-val" style="color:var(--red)">−${fmt(Math.abs(n.linha.valor))}</div></div>
+        </div>`).join('')}</div>
+      ${r.novos.length>8?`<div style="font-size:11px;color:var(--muted);margin-bottom:10px">…e outros ${r.novos.length-8}</div>`:''}
+      <button class="btn-p btn-green" onclick="enviarNovosParaRevisao()">Identificar ${r.novos.length} débito(s)</button>
+      <button class="btn-p btn-ghost" onclick="ignorarTodosNovos()">Ignorar todos</button>
+    `:`<div style="background:var(--green-d);border:1px solid rgba(0,229,160,.2);border-radius:13px;padding:13px;margin-top:12px;font-size:13px;color:var(--green)">✓ Tudo do extrato já está lançado.</div>`}
+  `;
+}
+
+// Manda os débitos não identificados para a mesma fila de conferência das fotos,
+// já com valor e data do banco e a categoria sugerida pela IA.
+async function enviarNovosParaRevisao(){
+  if(!ultimaConciliacao||!ultimaConciliacao.novos.length) return;
+  const novos=ultimaConciliacao.novos;
+  let sugestoes=[];
+  if(localStorage.getItem(SK_KEY)){
+    const ov=document.getElementById('proc-ov');
+    const tit=document.querySelector('.proc-title');
+    ov.classList.remove('hidden');
+    tit.textContent='Classificando os débitos...';
+    document.getElementById('proc-sub').textContent=`${novos.length} lançamentos`;
+    try{ sugestoes=await classificarDebitos(novos); }
+    catch(e){ showToast('⚠️','Sem sugestão da IA: '+e.message); }
+    finally{ ov.classList.add('hidden'); tit.textContent='Lendo com IA...'; }
+  }
+  const porIdx={};
+  (Array.isArray(sugestoes)?sugestoes:[]).forEach(s=>{ if(typeof s.i==='number') porIdx[s.i]=s; });
+
+  novos.forEach((n,i)=>{
+    const s=porIdx[i]||{};
+    const cat=s.cat&&getCatValida(s.cat,'out')?s.cat:null;
+    revisao.push({
+      rid:novoIdRev(),
+      origem:'extrato', extrato_fp:n.fp,
+      arquivo:'extrato',
+      tipo:'out',
+      valor:Math.abs(n.linha.valor),
+      cat,
+      desc:s.desc||n.linha.memo||'Débito do extrato',
+      forn:s.forn||'',
+      data:n.linha.data,
+      unit:null, obs:n.linha.memo?('Extrato: '+n.linha.memo):'',
+      img_key:null,
+      comp_id:null, comp_novo_total:null, fixa_id:null,
+      duvidas:[s.duvida||`Veio do extrato: "${n.linha.memo||'sem histórico'}"`].filter(Boolean),
+    });
+  });
+  save();
+  closeMo('mo-extrato');
+  setTab('revisao');
+  showToast('📥',`${novos.length} débito(s) na sua lista de conferência`);
+}
+
+function ignorarTodosNovos(){
+  if(!ultimaConciliacao) return;
+  const n=ultimaConciliacao.novos.length;
+  if(!confirm(`Ignorar ${n} débito(s)? Eles não serão lançados e não aparecerão em importações futuras.`)) return;
+  ultimaConciliacao.novos.forEach(x=>{ extratoVistos[x.fp]='ignorado'; });
+  save(); closeMo('mo-extrato');
+  showToast('🔇',`${n} débito(s) ignorados`);
+}
+
+// ══════════════════════════════════════════════════
 // FILA DE REVISÃO
 // ══════════════════════════════════════════════════
 function novoIdRev(){ return 'r'+Date.now()+Math.floor(Math.random()*10000); }
@@ -1873,6 +2303,11 @@ function renderRevisao(){
         ${aiTipsHTML()}
       </div>
       <div style="margin-top:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">🏦 Conferir extrato bancário</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Compara os débitos do banco com o que já está lançado e mostra o que ficou de fora: tarifa, pedágio, débito pequeno.</div>
+        <button class="btn-p btn-ghost" style="margin-top:0" onclick="openExtrato()">Importar extrato</button>
+      </div>
+      <div style="margin-top:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px">
         <div style="font-size:12px;font-weight:700;margin-bottom:10px">➕ Lançamento manual</div>
         <button class="btn-p btn-green" style="margin-top:0" onclick="openLanc('in')">+ Registrar Entrada</button>
         <button class="btn-p btn-red" onclick="openLanc('out')">− Registrar Saída</button>
@@ -1907,6 +2342,7 @@ function renderRevisao(){
       ${pend.length?`Lançar ${okN} pronto${okN===1?'':'s'} (${pend.length} ficam pendentes)`:`✓ Lançar ${revisao.length} lançamento${revisao.length===1?'':'s'}`}
     </button>
     <button class="btn-p btn-ghost" onclick="pickFiles()">+ Adicionar mais comprovantes</button>
+    <button class="btn-p btn-ghost" onclick="openExtrato()">🏦 Conferir extrato bancário</button>
     <button class="btn-p btn-del" onclick="descartarRevisao()">Descartar remessa</button>
   </div>`;
   el.innerHTML=html;
@@ -1925,6 +2361,7 @@ function revRowHTML(it,i){
     <div class="row-info">
       <div class="row-name">${esc(it.desc|| (cat?cat.label:'Sem descrição'))}</div>
       <div class="row-meta">${isIn?'📈 Entrada':'📉 Saída'}${cat?' · '+cat.label:''}${it.unit?' · '+getUnit(it.unit).name:''} · ${fmtDate(it.data)}</div>
+      ${it.origem==='extrato'?`<div class="rev-src">🏦 do extrato</div>`:''}
       ${pend.length?`<div class="rev-badge warn">⚠️ Falta: ${pend.join(', ')}</div>`:`<div class="rev-badge ok">✓ Pronto</div>`}
       ${(it.duvidas||[]).map(d=>`<div class="rev-duv">💬 ${esc(d)}</div>`).join('')}
     </div>
@@ -2025,6 +2462,7 @@ function descartarRevisaoItem(){
   if(revisaoIdx===null) return;
   const it=revisao[revisaoIdx];
   if(it&&it.img_key) imgDel(it.img_key);
+  if(it&&it.extrato_fp) extratoVistos[it.extrato_fp]='ignorado';
   revisao.splice(revisaoIdx,1);
   save(); closeMo('mo-lanc'); revisaoIdx=null; renderRevisao();
   showToast('🗑️','Comprovante descartado');
@@ -2058,7 +2496,10 @@ function lancarRevisao(){
       comp_id:it.tipo==='out'?compId:null,
       fixa_id:it.tipo==='out'?(it.fixa_id||null):null,
       img_key:it.img_key||null,
+      extrato_fp:it.extrato_fp||null,
     });
+    // Débito do extrato agora está lançado: não perguntar de novo numa reimportação.
+    if(it.extrato_fp) extratoVistos[it.extrato_fp]='lancado';
   });
   const n=prontos.length;
   revisao=revisao.filter(r=>!itemCompleto(r));
@@ -2070,7 +2511,10 @@ function lancarRevisao(){
 
 function descartarRevisao(){
   if(!confirm(`Descartar os ${revisao.length} comprovantes desta remessa? Eles não serão lançados.`)) return;
-  revisao.forEach(r=>{ if(r.img_key) imgDel(r.img_key); });
+  revisao.forEach(r=>{
+    if(r.img_key) imgDel(r.img_key);
+    if(r.extrato_fp) extratoVistos[r.extrato_fp]='ignorado';
+  });
   revisao=[]; save(); renderRevisao();
   showToast('🗑️','Remessa descartada');
 }
