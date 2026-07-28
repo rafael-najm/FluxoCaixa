@@ -116,10 +116,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 .upzone-ico{font-size:44px;margin-bottom:12px;}
 .upzone-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin-bottom:5px;}
 .upzone-sub{font-size:12px;color:var(--muted);line-height:1.5;}
-.type-toggle{display:flex;background:var(--s2);border-radius:16px;padding:4px;margin-bottom:16px;}
-.tt-btn{flex:1;padding:10px;border-radius:12px;border:none;background:none;font-family:'Syne',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;color:var(--muted);}
-.tt-btn.in.active{background:var(--green);color:#000;}
-.tt-btn.out.active{background:var(--red);color:#fff;}
+
 
 /* ── PROCESSING ── */
 .proc-ov{position:fixed;inset:0;background:rgba(9,9,15,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:18px;}
@@ -182,6 +179,25 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 .rel-val{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;}
 .install-b{background:linear-gradient(135deg,#131a2e,#0e1f18);border:1px solid rgba(0,229,160,.15);border-radius:18px;padding:13px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px;}
 .install-b.hidden{display:none;}
+
+/* ── BOTÃO + (remessa da noite) ── */
+.fab-main{position:fixed;bottom:calc(var(--nav-h) + 14px);right:16px;width:62px;height:62px;border-radius:22px;background:var(--green);color:#000;border:none;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:300;line-height:1;cursor:pointer;box-shadow:0 8px 28px rgba(0,229,160,.35);z-index:99;transition:transform .15s;}
+.fab-main:active{transform:scale(.9);}
+.fab-main.hidden{display:none;}
+.fab-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;border-radius:11px;background:var(--yellow);color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--bg);}
+
+/* ── REVISÃO ── */
+.rev-top{padding:4px 2px 12px;}
+.rev-top-t{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;}
+.rev-top-s{font-size:12px;color:var(--muted);margin-top:3px;font-weight:600;}
+.rev-bulk{background:var(--s1);border:1px solid rgba(255,209,102,.22);border-radius:18px;padding:14px 16px;}
+.rev-sel{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:13px;color:var(--text);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:15px;outline:none;-webkit-appearance:none;appearance:none;}
+.rev-thumb{width:52px;height:52px;border-radius:12px;object-fit:cover;flex-shrink:0;background:#000;}
+.rev-badge{display:inline-block;font-size:10px;font-weight:700;border-radius:7px;padding:3px 7px;margin-top:5px;}
+.rev-badge.ok{background:var(--green-d);color:var(--green);}
+.rev-badge.warn{background:var(--yellow-d);color:var(--yellow);}
+.rev-duv{font-size:11px;color:var(--yellow);margin-top:4px;line-height:1.4;}
+.rev-duv-box{background:var(--yellow-d);border:1px solid rgba(255,209,102,.25);border-radius:13px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--yellow);line-height:1.6;}
 </style>
 </head>
 <body>
@@ -199,40 +215,21 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
   <!-- PAGES -->
   <div class="content" id="page-home"><div class="page" id="home-content"></div></div>
   <div class="content hidden" id="page-lancamentos"><div class="page" id="lanc-content"></div></div>
-  <div class="content hidden" id="page-enviar">
-    <div class="page">
-      <div class="type-toggle">
-        <button class="tt-btn in active" id="tt-in" onclick="setUploadType('in')">📈 Entrada</button>
-        <button class="tt-btn out" id="tt-out" onclick="setUploadType('out')">📉 Saída</button>
-      </div>
-      <div class="upzone in" id="upzone" onclick="document.getElementById('file-in').click()">
-        <div class="upzone-ico" id="upzone-ico">📸</div>
-        <div class="upzone-title" id="upzone-title">Foto do comprovante</div>
-        <div class="upzone-sub" id="upzone-sub">Toque para abrir câmera ou galeria.<br/>A IA lê e registra tudo automaticamente.</div>
-      </div>
-      <input type="file" id="file-in" accept="image/*" multiple capture="environment" style="display:none" onchange="handleFiles(this.files)"/>
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-top:4px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:10px">🤖 O que a IA identifica</div>
-        <div id="ai-tips-list"></div>
-      </div>
-      <div style="margin-top:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:10px">➕ Lançamento rápido manual</div>
-        <button class="btn-p btn-green" style="margin-top:0" onclick="openLanc('in')">+ Registrar Entrada</button>
-        <button class="btn-p btn-red" onclick="openLanc('out')">− Registrar Saída</button>
-      </div>
-    </div>
-  </div>
+  <div class="content hidden" id="page-revisao"><div class="page" id="rev-content"></div></div>
   <div class="content hidden" id="page-relatorio"><div class="page" id="rel-content"></div></div>
   <div class="content hidden" id="page-config"><div class="page" id="cfg-content"></div></div>
 
   <nav class="nav">
     <button class="ni active" id="ni-home" onclick="setTab('home')"><div class="ni-ico">🏠</div><div class="ni-lbl">Início</div></button>
     <button class="ni" id="ni-lancamentos" onclick="setTab('lancamentos')"><div class="ni-ico">📋</div><div class="ni-lbl">Lançamentos</div></button>
-    <button class="ni" id="ni-enviar" onclick="setTab('enviar')"><div class="ni-ico">📷</div><div class="ni-lbl">Enviar</div></button>
+    <button class="ni" id="ni-revisao" onclick="setTab('revisao')"><div class="ni-ico">📷</div><div class="ni-lbl">Revisar</div></button>
     <button class="ni" id="ni-relatorio" onclick="setTab('relatorio')"><div class="ni-ico">📊</div><div class="ni-lbl">Relatório</div></button>
     <button class="ni" id="ni-config" onclick="setTab('config')"><div class="ni-ico">⚙️</div><div class="ni-lbl">Config</div></button>
   </nav>
 </div>
+
+<button class="fab-main" id="fab-main" onclick="pickFiles()">+<span class="fab-badge hidden" id="fab-badge"></span></button>
+<input type="file" id="file-in" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files);this.value=''"/>
 
 <!-- PROCESSING -->
 <div class="proc-ov hidden" id="proc-ov">
@@ -381,7 +378,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(
 // STATE
 // ══════════════════════════════════════════════════
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
-const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1';
+const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1', SK_R = 'fc_revisao_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
 const CAT_IN = [
@@ -457,21 +454,115 @@ let filter = JSON.parse(localStorage.getItem(SK_F)||'null') || {period:'mes',uni
 let socios   = JSON.parse(localStorage.getItem(SK_S)||'null') || DEFAULT_SOCIOS;
 let compromissos = JSON.parse(localStorage.getItem(SK_C)||'[]');
 let fixas    = JSON.parse(localStorage.getItem(SK_FX)||'[]');
+// Fila da remessa da noite: fica salva para não perder nada se ele fechar o app.
+let revisao  = JSON.parse(localStorage.getItem(SK_R)||'[]');
 
 let currentTab = 'home';
-let uploadType = 'in';
+let uploadType = 'auto';
 let editingLancId = null;
 let editingMaqId  = null;
 let editingFixaId = null;
+let revisaoIdx = null;
 
+// As fotos ficam no localStorage junto com os lançamentos, e a cota do navegador
+// é pequena (~5MB). Se estourar, avisa em vez de perder o lançamento em silêncio.
 function save(){
-  localStorage.setItem(SK_L,JSON.stringify(lancamentos));
-  localStorage.setItem(SK_M,JSON.stringify(maquinas));
-  localStorage.setItem(SK_U,JSON.stringify(units));
-  localStorage.setItem(SK_F,JSON.stringify(filter));
-  localStorage.setItem(SK_S,JSON.stringify(socios));
-  localStorage.setItem(SK_C,JSON.stringify(compromissos));
-  localStorage.setItem(SK_FX,JSON.stringify(fixas));
+  try{
+    localStorage.setItem(SK_L,JSON.stringify(lancamentos));
+    localStorage.setItem(SK_M,JSON.stringify(maquinas));
+    localStorage.setItem(SK_U,JSON.stringify(units));
+    localStorage.setItem(SK_F,JSON.stringify(filter));
+    localStorage.setItem(SK_S,JSON.stringify(socios));
+    localStorage.setItem(SK_C,JSON.stringify(compromissos));
+    localStorage.setItem(SK_FX,JSON.stringify(fixas));
+    localStorage.setItem(SK_R,JSON.stringify(revisao));
+    return true;
+  }catch(e){
+    // Última tentativa: grava tudo sem as fotos, que é o que ocupa espaço.
+    try{
+      localStorage.setItem(SK_L,JSON.stringify(lancamentos.map(l=>{const c={...l};delete c.img_b64;delete c.img_mime;return c;})));
+      localStorage.setItem(SK_R,JSON.stringify(revisao.map(r=>{const c={...r};delete c.img_b64;delete c.img_mime;return c;})));
+      showToast('⚠️','Memória cheia: fotos antigas foram descartadas, os valores foram salvos');
+      lancamentos.forEach(l=>{delete l.img_b64;delete l.img_mime;});
+      return true;
+    }catch(e2){
+      showToast('❌','Memória do app cheia. Apague lançamentos antigos em Config.');
+      return false;
+    }
+  }
+}
+
+// ── FOTOS (IndexedDB) ──
+// As fotos não cabem no localStorage: são dezenas por dia e a cota é de ~5MB.
+// Ficam no IndexedDB e o resto do app guarda só a chave.
+const IDB_NAME='fluxocaixa', IDB_STORE='fotos';
+let _idb=null;
+function idb(){
+  if(_idb) return _idb;
+  _idb=new Promise((res,rej)=>{
+    const rq=indexedDB.open(IDB_NAME,1);
+    rq.onupgradeneeded=()=>{ if(!rq.result.objectStoreNames.contains(IDB_STORE)) rq.result.createObjectStore(IDB_STORE); };
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error);
+  });
+  return _idb;
+}
+async function idbTx(mode,fn){
+  try{
+    const db=await idb();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction(IDB_STORE,mode);
+      const st=tx.objectStore(IDB_STORE);
+      const out=fn(st);
+      tx.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);
+      tx.onerror=()=>rej(tx.error);
+    });
+  }catch(e){ return null; }
+}
+const imgPut = (k,v) => idbTx('readwrite',st=>st.put(v,k));
+const imgGet = k => idbTx('readonly',st=>st.get(k));
+const imgDel = k => idbTx('readwrite',st=>st.delete(k));
+
+// As listas montam <img data-imgk> e a foto entra depois, já que o IDB é assíncrono.
+async function hydrateImgs(root){
+  const els=(root||document).querySelectorAll('img[data-imgk]');
+  for(const el of els){
+    const k=el.getAttribute('data-imgk');
+    el.removeAttribute('data-imgk');
+    const b64=await imgGet(k);
+    if(b64) el.src='data:image/jpeg;base64,'+b64;
+  }
+}
+// Aceita tanto os lançamentos antigos (foto embutida) quanto os novos (chave no IDB).
+function imgTag(obj, cls){
+  if(obj.img_b64) return `<img class="${cls}" src="data:${obj.img_mime||'image/jpeg'};base64,${obj.img_b64}"/>`;
+  if(obj.img_key) return `<img class="${cls}" data-imgk="${esc(obj.img_key)}" alt=""/>`;
+  return '';
+}
+
+// Reduz a foto antes de enviar para a IA e antes de guardar: foto de celular tem
+// 3-4MB, e são dezenas por dia.
+function resizeImg(file, maxDim, quality){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let {width:w,height:h}=img;
+      if(Math.max(w,h)>maxDim){
+        const r=maxDim/Math.max(w,h);
+        w=Math.round(w*r); h=Math.round(h*r);
+      }
+      const cv=document.createElement('canvas');
+      cv.width=w; cv.height=h;
+      const cx=cv.getContext('2d');
+      cx.fillStyle='#fff'; cx.fillRect(0,0,w,h);
+      cx.drawImage(img,0,0,w,h);
+      resolve(cv.toDataURL('image/jpeg',quality).split(',')[1]);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('Não consegui abrir a imagem')); };
+    img.src=url;
+  });
 }
 
 // ══════════════════════════════════════════════════
@@ -587,12 +678,18 @@ function setPeriod(p){ filter.period=p; save(); renderPeriodBar(); renderPage(cu
 // ══════════════════════════════════════════════════
 // TABS
 // ══════════════════════════════════════════════════
+// Abre direto o seletor de fotos: é o "maisinho" que ele aperta de noite.
+function pickFiles(){ document.getElementById('file-in').click(); }
+
 function setTab(tab){
   currentTab=tab;
-  ['home','lancamentos','enviar','relatorio','config'].forEach(t=>{
+  ['home','lancamentos','revisao','relatorio','config'].forEach(t=>{
     document.getElementById('page-'+t).classList.toggle('hidden',t!==tab);
     document.getElementById('ni-'+t)?.classList.toggle('active',t===tab);
   });
+  // Na revisão o filtro de período não se aplica, e o + já existe dentro da tela.
+  document.getElementById('period-bar').style.display=tab==='revisao'?'none':'flex';
+  document.getElementById('fab-main').classList.toggle('hidden',tab==='revisao');
   renderPage(tab);
 }
 function renderPage(tab){
@@ -600,7 +697,17 @@ function renderPage(tab){
   if(tab==='lancamentos')renderLancamentos();
   if(tab==='relatorio')  renderRelatorio();
   if(tab==='config')     renderConfig();
-  if(tab==='enviar')     renderAiTips();
+  if(tab==='revisao')    renderRevisao();
+  atualizarBadge();
+}
+
+// Mostra no + quantos comprovantes estão esperando conferência.
+function atualizarBadge(){
+  const b=document.getElementById('fab-badge');
+  if(!b) return;
+  const n=revisao.length;
+  b.textContent=n>99?'99+':n;
+  b.classList.toggle('hidden',n===0);
 }
 
 // ══════════════════════════════════════════════════
@@ -1071,9 +1178,54 @@ function renderConfig(){
 
   <div style="margin-top:24px;padding:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px">
     <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted)">DADOS</div>
-    <button class="btn-p btn-del" style="margin-top:0" onclick="if(confirm('Apagar TODOS os lançamentos?')){lancamentos=[];save();renderPage(currentTab);showToast('🗑️','Dados apagados');}">🗑️ Apagar todos os lançamentos</button>
+    <div id="cfg-espaco" style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">Calculando espaço usado…</div>
+    <button class="btn-p btn-ghost" style="margin-top:0" onclick="limparFotosAntigas()">🖼️ Liberar espaço (apagar fotos antigas)</button>
+    <button class="btn-p btn-del" onclick="apagarTudo()">🗑️ Apagar todos os lançamentos</button>
   </div>`;
   document.getElementById('cfg-content').innerHTML=html;
+  mostrarEspaco();
+}
+
+// ── ESPAÇO / FOTOS ──
+async function mostrarEspaco(){
+  const el=document.getElementById('cfg-espaco');
+  if(!el) return;
+  const comFoto=lancamentos.filter(l=>l.img_key||l.img_b64).length;
+  let txt=`${lancamentos.length} lançamentos · ${comFoto} com foto`;
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const {usage}=await navigator.storage.estimate();
+      if(usage) txt+=` · ${(usage/1048576).toFixed(1)} MB usados`;
+    }
+  }catch(e){}
+  el.textContent=txt;
+}
+
+// Mantém os valores e descarta só as imagens dos lançamentos mais antigos.
+async function limparFotosAntigas(){
+  const comFoto=lancamentos.filter(l=>l.img_key||l.img_b64);
+  if(!comFoto.length){ showToast('ℹ️','Nenhuma foto guardada'); return; }
+  const manter=parseInt(prompt(`Você tem ${comFoto.length} fotos guardadas.\nQuantas mais recentes quer manter?`,'100'));
+  if(isNaN(manter)||manter<0) return;
+  const ordenados=[...lancamentos].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const manterIds=new Set(ordenados.filter(l=>l.img_key||l.img_b64).slice(0,manter).map(l=>l.id));
+  let n=0;
+  for(const l of lancamentos){
+    if((l.img_key||l.img_b64)&&!manterIds.has(l.id)){
+      if(l.img_key) await imgDel(l.img_key);
+      delete l.img_key; delete l.img_b64; delete l.img_mime;
+      n++;
+    }
+  }
+  save(); renderConfig();
+  showToast('✅',`${n} foto(s) apagadas. Valores mantidos.`);
+}
+
+async function apagarTudo(){
+  if(!confirm('Apagar TODOS os lançamentos? Isso não pode ser desfeito.')) return;
+  for(const l of lancamentos){ if(l.img_key) await imgDel(l.img_key); }
+  lancamentos=[]; save(); renderPage(currentTab);
+  showToast('🗑️','Dados apagados');
 }
 
 // ── SÓCIOS ──
@@ -1229,7 +1381,9 @@ function calcLancPreview(){
 }
 
 function openLanc(tipo){
-  editingLancId=null;
+  editingLancId=null; revisaoIdx=null;
+  document.getElementById('l-save-btn').textContent='Salvar';
+  document.getElementById('l-del-btn').textContent='Excluir lançamento';
   document.getElementById('mo-lanc-title').textContent=tipo==='in'?'Nova Entrada':'Nova Saída';
   document.getElementById('mo-img-wrap').innerHTML='';
   populateLancModal(tipo);
@@ -1249,7 +1403,9 @@ function openLanc(tipo){
 
 function openEditLanc(id){
   const l=lancamentos.find(x=>x.id===id); if(!l) return;
-  editingLancId=id;
+  editingLancId=id; revisaoIdx=null;
+  document.getElementById('l-save-btn').textContent='Salvar';
+  document.getElementById('l-del-btn').textContent='Excluir lançamento';
   document.getElementById('mo-lanc-title').textContent='Editar Lançamento';
   populateLancModal(l.tipo);
   document.getElementById('l-tipo').value=l.tipo;
@@ -1266,13 +1422,16 @@ function openEditLanc(id){
   document.getElementById('l-fixa').value=l.fixa_id||'';
   onCompChange();
   document.getElementById('l-del-btn').style.display='block';
-  if(l.img_b64) document.getElementById('mo-img-wrap').innerHTML=`<img class="rec-img" src="data:${l.img_mime};base64,${l.img_b64}"/>`;
-  else document.getElementById('mo-img-wrap').innerHTML='';
+  const iw=document.getElementById('mo-img-wrap');
+  iw.innerHTML=imgTag(l,'rec-img');
+  hydrateImgs(iw);
   calcLancPreview();
   openMo('mo-lanc');
 }
 
 function saveLanc(){
+  // Mesmo modal serve para conferir a remessa da noite e para lançar na mão.
+  if(revisaoIdx!==null){ salvarRevisaoItem(); return; }
   const val=parseFloat(document.getElementById('l-valor').value);
   if(!val||val<=0){ showToast('⚠️','Informe um valor válido'); return; }
   const tipo=document.getElementById('l-tipo').value;
@@ -1318,6 +1477,7 @@ function saveLanc(){
   if(editingLancId){
     // preserve image
     const old=lancamentos.find(x=>x.id===editingLancId);
+    if(old?.img_key) entry.img_key=old.img_key;
     if(old?.img_b64){ entry.img_b64=old.img_b64; entry.img_mime=old.img_mime; }
     lancamentos=lancamentos.map(x=>x.id===editingLancId?entry:x);
     showToast('✅','Lançamento atualizado');
@@ -1329,7 +1489,10 @@ function saveLanc(){
 }
 
 function deleteLanc(){
+  if(revisaoIdx!==null){ descartarRevisaoItem(); return; }
   if(!editingLancId) return;
+  const alvo=lancamentos.find(x=>x.id===editingLancId);
+  if(alvo&&alvo.img_key) imgDel(alvo.img_key);
   lancamentos=lancamentos.filter(x=>x.id!==editingLancId);
   save(); closeMo('mo-lanc'); renderPage(currentTab);
   showToast('🗑️','Lançamento removido');
@@ -1455,75 +1618,85 @@ function deleteMaq(){
 // ══════════════════════════════════════════════════
 // UPLOAD + AI
 // ══════════════════════════════════════════════════
-function setUploadType(t){
-  uploadType=t;
-  document.getElementById('tt-in').classList.toggle('active',t==='in');
-  document.getElementById('tt-out').classList.toggle('active',t==='out');
-  const zone=document.getElementById('upzone');
-  zone.className='upzone '+(t==='in'?'in':'out');
-  document.getElementById('upzone-ico').textContent=t==='in'?'📸':'🧾';
-  document.getElementById('upzone-title').textContent=t==='in'?'Foto do comprovante':'Foto da nota/recibo';
-  document.getElementById('upzone-sub').textContent=t==='in'
-    ?'Toque para abrir câmera ou galeria.\nA IA lê e registra tudo automaticamente.'
-    :'Fotografe nota, comprovante bancário ou até uma anotação escrita à mão com nome e valor.\nA IA identifica valor, categoria e fornecedor.';
-  renderAiTips();
-}
-
-function renderAiTips(){
-  const tips=uploadType==='in'
-    ?['Valor bruto da transação','Tipo: débito, crédito, PIX','Qual maquininha foi usada','Data da venda']
-    :['Valor da despesa','Categoria (tecido, funcionários, etc.)','Nome do fornecedor/beneficiário','Data do pagamento','Se é parcela de uma despesa maior já registrada'];
-  document.getElementById('ai-tips-list').innerHTML=tips.map(t=>
+const AI_TIPS=[
+  'Se é entrada (venda) ou saída (pagamento)',
+  'Valor, data e para quem foi o pagamento',
+  'Categoria: tecido, funcionários, luz, aluguel…',
+  'Maquininha e forma de pagamento, nas vendas',
+  'Se é parcela de uma despesa maior já registrada',
+  'O que não estiver claro, ela pergunta a você',
+];
+function aiTipsHTML(){
+  return AI_TIPS.map(t=>
     `<div style="display:flex;gap:10px;margin-bottom:8px;font-size:12px;color:var(--muted)"><span style="color:var(--green);font-weight:700">✓</span>${t}</div>`
   ).join('');
 }
 
-async function lerImagem(base64, mimeType, tipo){
-  const listaMaq=maquinas.map(m=>`- ${m.name} (id:${m.id})`).join('\n');
+async function lerImagem(base64, mimeType, tipoHint){
+  const listaMaq=maquinas.map(m=>`- ${m.name} (id:${m.id}, unidade:${m.unit})`).join('\n');
   const listaCatOut=catsOut().map(c=>`- ${c.id}: ${c.label}`).join('\n');
   const listaCatIn=CAT_IN.map(c=>`- ${c.id}: ${c.label}`).join('\n');
+  const listaUnits=units.map(u=>`- ${u.id}: ${u.name}`).join('\n');
   const abertos=compsAbertos();
   const listaComp=abertos.length
     ? abertos.map(c=>`- id:${c.id} | ${c.desc} | fornecedor: ${c.forn||'não informado'} | total ${fmt(c.valor_total)} | já pago ${fmt(compPago(c.id))} | falta ${fmt(compSaldo(c))}`).join('\n')
     : '(nenhuma)';
+  const listaFixas=fixas.length
+    ? fixas.map(f=>`- id:${f.id} | ${f.desc} | ${getCat(f.cat).label} | ${fmt(f.valor)}/mês | unidade:${f.unit}`).join('\n')
+    : '(nenhuma)';
 
-  const promptIn=`Você é um extrator de dados financeiros brasileiro. Analise este comprovante de recebimento de maquininha de cartão.
+  const dica = tipoHint==='in' ? '\nO usuário indicou que este comprovante é uma ENTRADA (recebimento).'
+             : tipoHint==='out' ? '\nO usuário indicou que este comprovante é uma SAÍDA (pagamento).'
+             : '\nDescubra você mesmo se é entrada ou saída.';
 
-Máquinas:
+  const prompt=`Você é um extrator de dados financeiros brasileiro, trabalhando para uma confecção de roupa feminina que também tem lojas próprias.
+
+Analise a imagem e diga o que ela registra. Ela pode ter formatos bem diferentes, todos válidos:
+- Comprovante de venda de maquininha de cartão (ENTRADA)
+- Comprovante de PIX/transferência recebida (ENTRADA)
+- Nota fiscal, recibo ou boleto pago (SAÍDA)
+- Print de comprovante de pagamento do aplicativo do banco (SAÍDA)
+- Conta de consumo: luz, água, telefone (SAÍDA)
+- Uma anotação manuscrita simples, só com o nome da pessoa e o valor, sem comprovante formal (geralmente SAÍDA)
+${dica}
+
+Unidades do negócio:
+${listaUnits}
+
+Máquinas de cartão:
 ${listaMaq}
-Categorias de entrada:
+
+Categorias de ENTRADA:
 ${listaCatIn}
 
-Retorne APENAS JSON:
-{"valor":número,"tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix","maquina_id":"id","cat":"id_categoria","desc":"descrição curta","data":"YYYY-MM-DD ou null"}`;
-
-  const promptOut=`Você é um extrator de dados financeiros brasileiro. Analise esta imagem de comprovante de despesa de uma confecção de roupa feminina com várias lojas.
-
-A imagem pode ser de formatos bem diferentes, todos válidos:
-- Nota fiscal ou recibo formal
-- Print de comprovante de pagamento/PIX do aplicativo do banco
-- Uma anotação manuscrita simples, só com o nome da pessoa/empresa e o valor, sem nenhum comprovante formal
-- Boleto ou conta de consumo (luz, água, telefone)
-
-Categorias de saída disponíveis:
+Categorias de SAÍDA:
 ${listaCatOut}
+As categorias que começam com "pessoal_" são retiradas pessoais de cada sócio — use apenas quando o comprovante indicar claramente o nome daquele sócio.
 
-Se a categoria não ficar clara pelo conteúdo, use "outros_out". As categorias que começam com "pessoal_" são retiradas pessoais de cada sócio — use apenas quando o comprovante indicar claramente o nome daquele sócio ou que é despesa pessoal dele.
+Contas fixas mensais cadastradas (se o comprovante for o pagamento de uma delas, devolva o id em "fixa_id"):
+${listaFixas}
 
-Despesas parceladas já em aberto (pagamentos anteriores registrados):
+Despesas parceladas já em aberto:
 ${listaComp}
+Este pagamento pode ser uma PARCELA de uma despesa maior. Observe indícios como "1ª parcela", "sinal", "entrada", "restante", "saldo", ou o mesmo fornecedor de uma despesa em aberto acima.
+- Se se refere claramente a uma das despesas em aberto, devolva o id dela em "comp_id".
+- Se indica que é parte de um total maior que ainda não está na lista, devolva o total em "valor_total".
+- Se é pagamento único e completo, devolva ambos como null.
 
-Este pagamento pode ser uma PARCELA de uma despesa maior. Preste atenção em indícios como "1ª parcela", "sinal", "entrada", "restante", "saldo", ou o mesmo fornecedor de uma despesa em aberto acima.
-- Se o comprovante se refere claramente a uma das despesas em aberto listadas, devolva o id dela em "comp_id".
-- Se o comprovante indica que este pagamento é parte de um total maior que ainda não está na lista, devolva esse total em "valor_total".
-- Se é um pagamento único e completo, devolva ambos como null.
+REGRA IMPORTANTE: não invente dados. Se algum campo não estiver legível ou não puder ser deduzido com segurança da imagem, devolva null nele e escreva em "duvidas" o que ficou faltando, em português simples, para a pessoa confirmar. É melhor perguntar do que errar. Em especial: quase nunca é possível saber a unidade/loja por um comprovante — só preencha "unit" se a imagem realmente indicar.
 
-Retorne APENAS JSON:
-{"valor":número_deste_pagamento,"cat":"id_categoria_mais_provavel","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null","comp_id":"id_da_despesa_em_aberto ou null","valor_total":número_total_da_despesa_ou_null}
+Se a imagem não for um comprovante financeiro (foto aleatória, muito borrada, ilegível), devolva {"erro":"motivo curto"}.
 
-Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionarios"; conta de luz → cat:"energia"; nota de costureira → cat:"confeccao"; anotação manuscrita "Maria - R$300" sem mais contexto → cat:"outros_out", forn:"Maria"; recibo "2ª parcela costureira Ana, R$300 de R$1000" → valor:300, forn:"Ana", valor_total:1000`;
+Retorne APENAS JSON, sem texto em volta:
+{"tipo":"in"|"out","valor":número,"cat":"id_categoria","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":"id ou null","comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","duvidas":["o que ficou incerto"]}
 
-  const prompt=tipo==='in'?promptIn:promptOut;
+Exemplos:
+- Comprovante Stone R$ 250 débito → tipo:"in", valor:250, tipo_pag:"debito", cat:"venda_cartao", maquina_id da Stone
+- Foto de tecido com nota → tipo:"out", cat:"tecido"
+- Holerite → tipo:"out", cat:"funcionarios"
+- Conta de luz → tipo:"out", cat:"energia"
+- Anotação "Maria - R$300" → tipo:"out", cat:"outros_out", forn:"Maria", duvidas:["Não diz a que se refere o pagamento para Maria"]
+- Recibo "2ª parcela costureira Ana, R$300 de R$1000" → tipo:"out", valor:300, forn:"Ana", valor_total:1000, cat:"confeccao"`;
 
   const apiKey=localStorage.getItem(SK_KEY);
   if(!apiKey) throw new Error('Configure a chave de API em Config');
@@ -1537,7 +1710,7 @@ Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionari
       'X-Title':'FluxoCaixa'
     },
     body:JSON.stringify({
-      model:OR_MODEL,max_tokens:600,
+      model:OR_MODEL,max_tokens:900,
       messages:[{role:'user',content:[
         {type:'text',text:prompt},
         {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
@@ -1547,9 +1720,14 @@ Exemplos: foto de tecido → cat:"tecido"; holerite/salário → cat:"funcionari
   const data=await r.json();
   if(data.error) throw new Error(data.error.message||'Erro na API');
   const text=data.choices?.[0]?.message?.content||'';
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
+  const limpo=text.replace(/```json|```/g,'').trim();
+  const m=limpo.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error('Resposta da IA ilegível');
+  return JSON.parse(m[0]);
 }
 
+// Manda os comprovantes da noite em paralelo (com limite) e joga cada resultado
+// na fila de revisão. Nada é lançado antes dele confirmar.
 async function handleFiles(files){
   if(!localStorage.getItem(SK_KEY)){
     showToast('⚠️','Configure a chave de IA em Config');
@@ -1557,76 +1735,344 @@ async function handleFiles(files){
     return;
   }
   const arr=Array.from(files);
+  if(!arr.length) return;
+
   const ov=document.getElementById('proc-ov');
   const fill=document.getElementById('proc-fill');
   const sub=document.getElementById('proc-sub');
+  const tit=document.querySelector('.proc-title');
   ov.classList.remove('hidden');
+  tit.textContent=arr.length>1?`Lendo ${arr.length} comprovantes...`:'Lendo com IA...';
 
-  for(let i=0;i<arr.length;i++){
-    const file=arr[i];
-    sub.textContent=`${file.name} (${i+1}/${arr.length})`;
-    fill.style.width=`${((i+0.5)/arr.length)*80}%`;
-    try{
-      const base64=await new Promise((res,rej)=>{
-        const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file);
-      });
-      const res=await lerImagem(base64,file.type,uploadType);
-      fill.style.width=`${((i+1)/arr.length)*90}%`;
-      if(res.erro){ showToast('⚠️',`Não li: ${res.erro}`); continue; }
+  let prontos=0;
+  const atualiza=()=>{
+    sub.textContent=`${prontos} de ${arr.length}`;
+    fill.style.width=`${(prontos/arr.length)*100}%`;
+  };
+  atualiza();
 
-      let entry;
-      if(uploadType==='in'){
-        const maq=getMaq(res.maquina_id)||maquinas[0];
-        const pagtype=res.tipo_pag||'debito';
-        const liq=calcLiquido(res.valor,pagtype,maq);
-        const rec=calcDataRec(pagtype,maq);
-        entry={
-          id:Date.now()+Math.random()+'',tipo:'in',
-          cat:res.cat||'venda_cartao',
-          valor:res.valor,valor_liquido:liq,
-          maq_id:maq?.id,pagtype,
-          data:res.data||today(),data_rec:rec,
-          desc:res.desc||'Venda',
-          unit:maq?.unit||units[0]?.id,
-          img_b64:base64,img_mime:file.type,
-        };
-      } else {
-        const cat=res.cat||'outros_out';
-        const unitId=units[0]?.id;
-        // Vincula a uma despesa parcelada: pelo id que a IA identificou, senão
-        // por fornecedor compatível, senão cria uma nova se veio um valor total.
-        let comp=res.comp_id?getComp(res.comp_id):null;
-        if(comp&&compQuitado(comp)) comp=null;
-        if(!comp) comp=acharCompPorForn(res.forn);
-        if(!comp&&res.valor_total&&res.valor_total>res.valor+0.005){
-          comp={id:'c'+Date.now()+Math.floor(Math.random()*1000),
-            desc:res.desc||getCat(cat).label,valor_total:res.valor_total,
-            cat,forn:res.forn,unit:unitId,criado:today()};
-          compromissos.push(comp);
-        }
-        entry={
-          id:Date.now()+Math.random()+'',tipo:'out',
-          cat,
-          valor:res.valor,valor_liquido:res.valor,
-          data:res.data||today(),
-          desc:res.desc||getCat(cat).label,
-          forn:res.forn,
-          unit:unitId,
-          comp_id:comp?comp.id:null,
-          img_b64:base64,img_mime:file.type,
-        };
+  const CONCURRENCY=3;
+  const resultados=new Array(arr.length);
+  let cursor=0;
+
+  async function worker(){
+    while(cursor<arr.length){
+      const i=cursor++;
+      const file=arr[i];
+      try{
+        // Uma cópia menor para a IA, e uma miniatura leve para guardar no IDB.
+        const paraIA=await resizeImg(file,1400,0.82);
+        const key=await guardarThumb(file);
+        const res=await lerImagem(paraIA,'image/jpeg',uploadType);
+        resultados[i]=montarItemRevisao(res,key,file.name);
+      }catch(e){
+        // Nunca descarta o comprovante: entra na fila para ele preencher na mão.
+        let key=null;
+        try{ key=await guardarThumb(file); }catch(_){}
+        resultados[i]=itemRevisaoVazio(key,file.name,e.message);
       }
-      lancamentos.unshift(entry);
-      save();
-      const vinc=entry.comp_id?getComp(entry.comp_id):null;
-      if(vinc) showToast('🧾',`${fmt(res.valor)} em ${vinc.desc} · falta ${fmt(compSaldo(vinc))}`);
-      else showToast('✅',`${fmt(res.valor)} registrado!`);
-    } catch(e){ showToast('❌',`Erro: ${e.message}`); }
+      prontos++; atualiza();
+    }
   }
+  await Promise.all(Array.from({length:Math.min(CONCURRENCY,arr.length)},worker));
+
+  revisao.push(...resultados.filter(Boolean));
+  save();
 
   fill.style.width='100%';
-  setTimeout(()=>{ ov.classList.add('hidden'); fill.style.width='0%'; },400);
-  setTimeout(()=>setTab('lancamentos'),600);
+  setTimeout(()=>{ ov.classList.add('hidden'); fill.style.width='0%'; tit.textContent='Lendo com IA...'; },400);
+  const pend=revisao.filter(r=>!itemCompleto(r)).length;
+  setTimeout(()=>{
+    setTab('revisao');
+    if(pend) showToast('📝',`${pend} de ${revisao.length} precisam da sua conferência`);
+    else showToast('✅',`${revisao.length} comprovante(s) lidos. Confira e lance.`);
+  },500);
+}
+
+// ══════════════════════════════════════════════════
+// FILA DE REVISÃO
+// ══════════════════════════════════════════════════
+function novoIdRev(){ return 'r'+Date.now()+Math.floor(Math.random()*10000); }
+
+async function guardarThumb(file){
+  const thumb=await resizeImg(file,640,0.6);
+  const key='img'+Date.now()+Math.floor(Math.random()*100000);
+  await imgPut(key,thumb);
+  return key;
+}
+
+function montarItemRevisao(res, imgKey, nome){
+  if(res.erro) return itemRevisaoVazio(imgKey,nome,res.erro);
+  const tipo = res.tipo==='in'?'in':(res.tipo==='out'?'out':(uploadType==='in'?'in':'out'));
+  const duvidas = Array.isArray(res.duvidas)?res.duvidas.filter(Boolean):[];
+  const it={
+    rid:novoIdRev(), arquivo:nome, tipo,
+    valor: (typeof res.valor==='number'&&res.valor>0)?res.valor:null,
+    cat: res.cat && getCatValida(res.cat,tipo) ? res.cat : null,
+    desc: res.desc||'',
+    forn: res.forn||'',
+    data: /^\d{4}-\d{2}-\d{2}$/.test(res.data||'')?res.data:today(),
+    unit: (res.unit&&getUnit(res.unit).id)?res.unit:null,
+    obs:'',
+    img_key:imgKey,
+    duvidas,
+  };
+  if(tipo==='in'){
+    const maq=res.maquina_id?getMaq(res.maquina_id):null;
+    it.maq_id=maq?maq.id:null;
+    it.pagtype=['debito','credito_1x','credito_2_6x','credito_7x','pix'].includes(res.tipo_pag)?res.tipo_pag:null;
+    if(maq&&!it.unit) it.unit=maq.unit;
+    if(!it.cat) it.cat = it.pagtype==='pix'?'venda_pix':'venda_cartao';
+  }else{
+    it.fixa_id = res.fixa_id&&getFixa(res.fixa_id)?res.fixa_id:null;
+    const fx=it.fixa_id?getFixa(it.fixa_id):null;
+    if(fx&&!it.unit) it.unit=fx.unit;
+    // Vínculo com despesa parcelada: id apontado pela IA, senão pelo fornecedor.
+    let comp=res.comp_id?getComp(res.comp_id):null;
+    if(comp&&compQuitado(comp)) comp=null;
+    if(!comp) comp=acharCompPorForn(res.forn);
+    it.comp_id=comp?comp.id:null;
+    it.comp_novo_total=(!comp&&res.valor_total&&it.valor&&res.valor_total>it.valor+0.005)?res.valor_total:null;
+    if(comp&&!it.unit) it.unit=comp.unit;
+  }
+  return it;
+}
+
+function itemRevisaoVazio(imgKey, nome, motivo){
+  return {rid:novoIdRev(),arquivo:nome,tipo:'out',valor:null,cat:null,desc:'',forn:'',
+    data:today(),unit:null,obs:'',img_key:imgKey,
+    duvidas:[motivo||'Não consegui ler este comprovante'],falhou:true};
+}
+
+function getCatValida(id,tipo){
+  const lista=tipo==='in'?CAT_IN:catsOut();
+  return lista.find(c=>c.id===id);
+}
+
+// Só entra no lançamento quando o essencial está preenchido.
+function itemPendencias(it){
+  const p=[];
+  if(!it.valor||it.valor<=0) p.push('valor');
+  if(!it.cat) p.push('categoria');
+  if(!it.unit) p.push('unidade');
+  if(it.tipo==='in'&&!it.pagtype) p.push('forma de pagamento');
+  return p;
+}
+function itemCompleto(it){ return itemPendencias(it).length===0; }
+
+function renderRevisao(){
+  const el=document.getElementById('rev-content');
+  if(!revisao.length){
+    el.innerHTML=`<div class="upzone in" onclick="pickFiles()" style="margin-top:4px">
+        <div class="upzone-ico">📸</div>
+        <div class="upzone-title">Comprovantes do dia</div>
+        <div class="upzone-sub">Toque e selecione todos de uma vez.<br/>A IA identifica entradas e saídas sozinha.</div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-top:4px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">🤖 O que a IA identifica</div>
+        ${aiTipsHTML()}
+      </div>
+      <div style="margin-top:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">➕ Lançamento manual</div>
+        <button class="btn-p btn-green" style="margin-top:0" onclick="openLanc('in')">+ Registrar Entrada</button>
+        <button class="btn-p btn-red" onclick="openLanc('out')">− Registrar Saída</button>
+      </div>`;
+    return;
+  }
+  const pend=revisao.filter(r=>!itemCompleto(r));
+  const okN=revisao.length-pend.length;
+
+  let html=`<div class="rev-top">
+    <div class="rev-top-t">Remessa de hoje</div>
+    <div class="rev-top-s">${revisao.length} comprovante${revisao.length===1?'':'s'} · <span style="color:var(--green)">${okN} pronto${okN===1?'':'s'}</span>${pend.length?` · <span style="color:var(--yellow)">${pend.length} para conferir</span>`:''}</div>
+  </div>`;
+
+  // Uma unidade para a remessa toda: a IA quase nunca sabe de qual loja é o papel.
+  const semUnit=revisao.filter(r=>!r.unit).length;
+  if(semUnit){
+    html+=`<div class="rev-bulk">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">🏪 ${semUnit} sem unidade definida</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">O comprovante normalmente não diz de qual loja é. Escolha aqui e aplico em todos que estão sem.</div>
+      <select id="rev-bulk-unit" class="rev-sel">${units.map(u=>`<option value="${u.id}">${u.icon} ${esc(u.name)}</option>`).join('')}</select>
+      <button class="btn-p btn-ghost" style="margin-top:8px" onclick="aplicarUnitEmTodos()">Aplicar a todos sem unidade</button>
+    </div>`;
+  }
+
+  html+=`<div class="lst" style="margin-top:12px" id="rev-list">`;
+  html+=revisao.map((it,i)=>revRowHTML(it,i)).join('');
+  html+=`</div>`;
+
+  html+=`<div style="margin-top:16px">
+    <button class="btn-p ${pend.length?'btn-ghost':'btn-green'}" onclick="lancarRevisao()">
+      ${pend.length?`Lançar ${okN} pronto${okN===1?'':'s'} (${pend.length} ficam pendentes)`:`✓ Lançar ${revisao.length} lançamento${revisao.length===1?'':'s'}`}
+    </button>
+    <button class="btn-p btn-ghost" onclick="pickFiles()">+ Adicionar mais comprovantes</button>
+    <button class="btn-p btn-del" onclick="descartarRevisao()">Descartar remessa</button>
+  </div>`;
+  el.innerHTML=html;
+  hydrateImgs(el);
+}
+
+function revRowHTML(it,i){
+  const cat=it.cat?getCat(it.cat):null;
+  const pend=itemPendencias(it);
+  const isIn=it.tipo==='in';
+  const cor=isIn?'var(--green)':'var(--red)';
+  const thumb=(it.img_key||it.img_b64)?imgTag(it,'rev-thumb')
+    :`<div class="rev-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--s2)">📄</div>`;
+  return `<div class="row" style="align-items:flex-start" onclick="openRevisaoItem(${i})">
+    ${thumb}
+    <div class="row-info">
+      <div class="row-name">${esc(it.desc|| (cat?cat.label:'Sem descrição'))}</div>
+      <div class="row-meta">${isIn?'📈 Entrada':'📉 Saída'}${cat?' · '+cat.label:''}${it.unit?' · '+getUnit(it.unit).name:''} · ${fmtDate(it.data)}</div>
+      ${pend.length?`<div class="rev-badge warn">⚠️ Falta: ${pend.join(', ')}</div>`:`<div class="rev-badge ok">✓ Pronto</div>`}
+      ${(it.duvidas||[]).map(d=>`<div class="rev-duv">💬 ${esc(d)}</div>`).join('')}
+    </div>
+    <div class="row-right">
+      <div class="row-val" style="color:${it.valor?cor:'var(--muted)'}">${it.valor?(isIn?'+':'−')+fmt(it.valor):'—'}</div>
+      <div class="row-sub" style="color:var(--muted)">toque para ${pend.length?'preencher':'ajustar'}</div>
+    </div>
+  </div>`;
+}
+
+function aplicarUnitEmTodos(){
+  const u=document.getElementById('rev-bulk-unit').value;
+  let n=0;
+  revisao.forEach(r=>{ if(!r.unit){ r.unit=u; n++; } });
+  save(); renderRevisao();
+  showToast('✅',`Unidade aplicada em ${n} comprovante(s)`);
+}
+
+function openRevisaoItem(i){
+  const it=revisao[i]; if(!it) return;
+  revisaoIdx=i; editingLancId=null;
+  document.getElementById('mo-lanc-title').textContent=`Conferir ${i+1} de ${revisao.length}`;
+  populateLancModal(it.tipo);
+  document.getElementById('l-tipo').value=it.tipo;
+  onTipoChange();
+  document.getElementById('l-valor').value=it.valor||'';
+  if(it.cat) document.getElementById('l-cat').value=it.cat;
+  document.getElementById('l-desc').value=it.desc||'';
+  document.getElementById('l-forn').value=it.forn||'';
+  document.getElementById('l-obs').value=it.obs||'';
+  document.getElementById('l-data').value=it.data||today();
+  document.getElementById('l-unit').value=it.unit||'';
+  if(it.tipo==='in'){
+    if(it.maq_id) document.getElementById('l-maquina').value=it.maq_id;
+    if(it.pagtype) document.getElementById('l-pagtype').value=it.pagtype;
+  }else{
+    document.getElementById('l-comp').value=it.comp_id||(it.comp_novo_total?'__new':'');
+    if(it.comp_novo_total) document.getElementById('l-comp-total').value=it.comp_novo_total;
+    document.getElementById('l-fixa').value=it.fixa_id||'';
+    onCompChange();
+  }
+  const duv=(it.duvidas||[]).length
+    ? `<div class="rev-duv-box">${it.duvidas.map(d=>`<div>💬 ${esc(d)}</div>`).join('')}</div>` : '';
+  const wrap=document.getElementById('mo-img-wrap');
+  wrap.innerHTML=imgTag(it,'rec-img')+duv;
+  hydrateImgs(wrap);
+  document.getElementById('l-del-btn').style.display='block';
+  document.getElementById('l-del-btn').textContent='Descartar este comprovante';
+  document.getElementById('l-save-btn').textContent='Confirmar';
+  calcLancPreview();
+  openMo('mo-lanc');
+}
+
+// Grava as correções de volta no item da fila (não lança ainda).
+function salvarRevisaoItem(){
+  const it=revisao[revisaoIdx]; if(!it) return;
+  const val=parseFloat(document.getElementById('l-valor').value);
+  const tipo=document.getElementById('l-tipo').value;
+  it.tipo=tipo;
+  it.valor=(val>0)?val:null;
+  it.cat=document.getElementById('l-cat').value||null;
+  it.desc=document.getElementById('l-desc').value;
+  it.forn=document.getElementById('l-forn').value;
+  it.obs=document.getElementById('l-obs').value;
+  it.data=document.getElementById('l-data').value||today();
+  it.unit=document.getElementById('l-unit').value||null;
+  if(tipo==='in'){
+    it.maq_id=document.getElementById('l-maquina').value||null;
+    it.pagtype=document.getElementById('l-pagtype').value||null;
+    it.comp_id=null; it.comp_novo_total=null; it.fixa_id=null;
+  }else{
+    const cv=document.getElementById('l-comp').value;
+    if(cv==='__new'){
+      const tot=parseFloat(document.getElementById('l-comp-total').value);
+      if(!tot||tot<=0){ showToast('⚠️','Informe o valor total da despesa'); return; }
+      if(it.valor&&tot<it.valor){ showToast('⚠️','Valor total menor que este pagamento'); return; }
+      it.comp_id=null; it.comp_novo_total=tot;
+    }else{
+      it.comp_id=cv||null; it.comp_novo_total=null;
+    }
+    it.fixa_id=document.getElementById('l-fixa').value||null;
+    it.maq_id=null; it.pagtype=null;
+  }
+  // O que ele preencheu na mão responde as dúvidas da IA.
+  if(itemCompleto(it)) it.duvidas=[];
+  it.falhou=false;
+  save();
+  closeMo('mo-lanc');
+  revisaoIdx=null;
+  renderRevisao();
+
+  const prox=revisao.findIndex(r=>!itemCompleto(r));
+  if(prox>=0) showToast('👉',`Faltam ${revisao.filter(r=>!itemCompleto(r)).length} para conferir`);
+  else showToast('✅','Tudo pronto para lançar!');
+}
+
+function descartarRevisaoItem(){
+  if(revisaoIdx===null) return;
+  const it=revisao[revisaoIdx];
+  if(it&&it.img_key) imgDel(it.img_key);
+  revisao.splice(revisaoIdx,1);
+  save(); closeMo('mo-lanc'); revisaoIdx=null; renderRevisao();
+  showToast('🗑️','Comprovante descartado');
+}
+
+// Converte os itens prontos em lançamentos de verdade.
+function lancarRevisao(){
+  const prontos=revisao.filter(itemCompleto);
+  if(!prontos.length){ showToast('⚠️','Nenhum está pronto ainda'); return; }
+  prontos.forEach(it=>{
+    let compId=it.comp_id||null;
+    if(!compId&&it.comp_novo_total){
+      const novo={id:'c'+Date.now()+Math.floor(Math.random()*10000),
+        desc:it.desc||getCat(it.cat).label,valor_total:it.comp_novo_total,
+        cat:it.cat,forn:it.forn,unit:it.unit,criado:today()};
+      compromissos.push(novo); compId=novo.id;
+    }
+    const maq=it.tipo==='in'?getMaq(it.maq_id):null;
+    const liq=it.tipo==='in'?calcLiquido(it.valor,it.pagtype,maq):it.valor;
+    lancamentos.unshift({
+      id:Date.now()+''+Math.floor(Math.random()*100000),
+      tipo:it.tipo, cat:it.cat,
+      val_bruto:it.tipo==='in'?it.valor:null,
+      valor:it.valor, valor_liquido:liq,
+      maq_id:it.tipo==='in'?it.maq_id:null,
+      pagtype:it.tipo==='in'?it.pagtype:null,
+      data:it.data,
+      data_rec:it.tipo==='in'?calcDataRec(it.pagtype,maq):null,
+      desc:it.desc||getCat(it.cat).label,
+      forn:it.forn, obs:it.obs, unit:it.unit,
+      comp_id:it.tipo==='out'?compId:null,
+      fixa_id:it.tipo==='out'?(it.fixa_id||null):null,
+      img_key:it.img_key||null,
+    });
+  });
+  const n=prontos.length;
+  revisao=revisao.filter(r=>!itemCompleto(r));
+  save();
+  renderRevisao();
+  if(revisao.length){ showToast('✅',`${n} lançados · ${revisao.length} ainda pendentes`); }
+  else { showToast('🎉',`${n} lançamento(s) registrados. Dia fechado!`); setTab('home'); }
+}
+
+function descartarRevisao(){
+  if(!confirm(`Descartar os ${revisao.length} comprovantes desta remessa? Eles não serão lançados.`)) return;
+  revisao.forEach(r=>{ if(r.img_key) imgDel(r.img_key); });
+  revisao=[]; save(); renderRevisao();
+  showToast('🗑️','Remessa descartada');
 }
 
 // ══════════════════════════════════════════════════
@@ -1659,8 +2105,10 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 // INIT
 // ══════════════════════════════════════════════════
 renderPeriodBar();
-renderHome();
-renderAiTips();
+atualizarBadge();
+// Se ficou remessa pela metade (fechou o app no meio), volta direto nela.
+if(revisao.length) setTab('revisao');
+else renderHome();
 </script>
 </body>
 </html>
