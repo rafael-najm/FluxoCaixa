@@ -490,12 +490,15 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
       <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px">
         Comparo os débitos do banco com o que já está lançado e mostro o que ficou de fora — tarifa, pedágio, débito pequeno no cartão.
       </div>
-      <button class="btn-p btn-green" style="margin-top:0" onclick="pickExtratoArquivo()">Escolher arquivo (OFX ou CSV)</button>
-      <button class="btn-p btn-ghost" onclick="pickExtratoFoto()">Foto ou print do extrato</button>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="pickExtratoFoto()">Prints do extrato</button>
+      <button class="btn-p btn-ghost" onclick="colarExtrato()">Colar print copiado</button>
+      <div class="note" style="margin-top:10px">Pode mandar vários prints de uma vez, rolando a tela do banco. Se algum pedaço aparecer repetido, eu descarto.</div>
       <div class="divider"></div>
-      <div class="field">
-        <label>Ou cole o extrato aqui</label>
-        <textarea id="ex-texto" placeholder="Cole as linhas do extrato (data, histórico e valor)" style="min-height:110px"></textarea>
+      <div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">Outras formas</div>
+      <button class="btn-p btn-ghost" style="margin-top:0" onclick="pickExtratoArquivo()">Arquivo do banco (OFX ou CSV)</button>
+      <div class="field" style="margin-top:14px">
+        <label>Ou cole o extrato em texto</label>
+        <textarea id="ex-texto" placeholder="Cole as linhas do extrato (data, histórico e valor)" style="min-height:90px"></textarea>
       </div>
       <button class="btn-p btn-ghost" style="margin-top:0" onclick="extratoDeTexto()">Conferir o texto colado</button>
       <div id="ex-resultado"></div>
@@ -888,7 +891,10 @@ document.addEventListener('paste', e=>{
   if(!imgs.length) return;
   e.preventDefault();
   const arquivos=imgs.map(i=>i.getAsFile()).filter(Boolean);
-  if(arquivos.length) handleFiles(arquivos);
+  if(!arquivos.length) return;
+  // Com o extrato aberto, a imagem colada é extrato; fora dele, é comprovante.
+  const noExtrato=document.getElementById('mo-extrato').classList.contains('open');
+  if(noExtrato) extratoDeFoto(arquivos); else handleFiles(arquivos);
 });
 
 function setTab(tab){
@@ -2163,6 +2169,27 @@ function aiTipsHTML(){
   ).join('');
 }
 
+// A API nem sempre devolve JSON: sem internet, erro de proxy ou chave inválida
+// vem HTML ou corpo vazio. Sem isso o Safari mostra um erro incompreensível.
+async function respostaIA(r){
+  const bruto=await r.text();
+  if(!r.ok){
+    let msg='';
+    try{ msg=(JSON.parse(bruto).error||{}).message||''; }catch(e){}
+    if(r.status===401||r.status===403) throw new Error('Chave de API recusada. Confira em Config.');
+    if(r.status===402) throw new Error('Sem crédito na OpenRouter.');
+    if(r.status===429) throw new Error('Muitas leituras seguidas. Tente de novo em instantes.');
+    throw new Error(msg||`Erro ${r.status} na API`);
+  }
+  let data;
+  try{ data=JSON.parse(bruto); }
+  catch(e){ throw new Error('A API respondeu algo inesperado. Verifique a internet.'); }
+  if(data.error) throw new Error(data.error.message||'Erro na API');
+  const txt=(((data.choices||[])[0]||{}).message||{}).content||'';
+  if(!txt.trim()) throw new Error('A IA respondeu vazio. Tente de novo.');
+  return txt.replace(/```json|```/g,'').trim();
+}
+
 // Chamada de texto ao modelo (sem imagem), usada para classificar os débitos.
 async function chamarIA(prompt, maxTokens){
   const apiKey=localStorage.getItem(SK_KEY);
@@ -2174,9 +2201,7 @@ async function chamarIA(prompt, maxTokens){
     body:JSON.stringify({model:OR_MODEL,max_tokens:maxTokens||1500,
       messages:[{role:'user',content:prompt}]})
   });
-  const data=await r.json();
-  if(data.error) throw new Error(data.error.message||'Erro na API');
-  const txt=(data.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
+  const txt=await respostaIA(r);
   const m=txt.match(/[\[{][\s\S]*[\]}]/);
   if(!m) throw new Error('Resposta da IA ilegível');
   return JSON.parse(m[0]);
@@ -2208,14 +2233,21 @@ Retorne APENAS um array JSON, um objeto por débito, na mesma ordem e com o índ
 async function lerExtratoImagem(base64){
   const apiKey=localStorage.getItem(SK_KEY);
   if(!apiKey) throw new Error('Configure a chave de API em Config');
-  const prompt=`Esta imagem é um extrato bancário ou uma lista de transações. Extraia TODAS as linhas visíveis.
+  const hoje=today();
+  const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})();
+  const prompt=`Esta imagem é um print do extrato de um banco brasileiro (app do celular ou internet banking). Extraia TODAS as linhas de transação visíveis.
 
-Para cada linha devolva a data, o valor absoluto, o histórico exatamente como aparece, e se é débito (saiu dinheiro) ou crédito (entrou).
+Como esses prints costumam ser:
+- As datas aparecem em cabeçalhos que agrupam várias transações abaixo ("10 de julho", "12 JUL", "Hoje", "Ontem"). Use o cabeçalho acima da linha quando ela não tiver data própria.
+- "Hoje" é ${hoje} e "Ontem" é ${ontem}.
+- Muitos apps não mostram sinal de menos. Decida pelo texto: "Pagamento", "Pix enviado", "Transferência enviada", "Compra", "Débito", "Saque", "Tarifa", "Boleto" são DÉBITO ("D"). "Pix recebido", "Transferência recebida", "Crédito", "Depósito", "Estorno", "Rendimento" são CRÉDITO ("C").
+- Ignore o que não é transação: saldo do dia, saldo disponível, saldo total, limite, cabeçalho do app, rodapé, botões.
+- O valor vem sempre positivo, sem sinal, no campo "valor".
 
-Não invente linhas e não deixe nenhuma de fora. Se a data não aparecer na linha, use a data do agrupamento acima dela.
+Não invente linhas e não deixe nenhuma de fora. Se algo estiver cortado na borda do print e não der para ler com segurança, omita essa linha.
 
 Retorne APENAS JSON:
-{"linhas":[{"data":"YYYY-MM-DD","valor":número_positivo,"memo":"histórico","tipo":"D"|"C"}]}`;
+{"linhas":[{"data":"YYYY-MM-DD","valor":número_positivo,"memo":"histórico como aparece","tipo":"D"|"C"}]}`;
   const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
@@ -2226,9 +2258,7 @@ Retorne APENAS JSON:
         {type:'image_url',image_url:{url:'data:image/jpeg;base64,'+base64}}
       ]}]})
   });
-  const data=await r.json();
-  if(data.error) throw new Error(data.error.message||'Erro na API');
-  const txt=(data.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
+  const txt=await respostaIA(r);
   const m=txt.match(/\{[\s\S]*\}/);
   if(!m) throw new Error('Não consegui ler o extrato da imagem');
   const j=JSON.parse(m[0]);
@@ -2328,10 +2358,7 @@ Exemplos:
       ]}]
     })
   });
-  const data=await r.json();
-  if(data.error) throw new Error(data.error.message||'Erro na API');
-  const text=data.choices?.[0]?.message?.content||'';
-  const limpo=text.replace(/```json|```/g,'').trim();
+  const limpo=await respostaIA(r);
   const m=limpo.match(/\{[\s\S]*\}/);
   if(!m) throw new Error('Resposta da IA ilegível');
   return JSON.parse(m[0]);
@@ -2414,6 +2441,27 @@ function openExtrato(){
 function pickExtratoArquivo(){ document.getElementById('file-extrato').click(); }
 function pickExtratoFoto(){ document.getElementById('file-extrato-img').click(); }
 
+// Print do extrato copiado vai para a conciliação, não para a fila de comprovantes.
+async function colarExtrato(){
+  try{
+    if(!navigator.clipboard || !navigator.clipboard.read){
+      showToast('warn','Este navegador não deixa colar direto; use Prints do extrato');
+      return;
+    }
+    const itens=await navigator.clipboard.read();
+    const arquivos=[];
+    for(const it of itens){
+      const tipo=(it.types||[]).find(t=>t.startsWith('image/'));
+      if(!tipo) continue;
+      arquivos.push(new File([await it.getType(tipo)],'extrato.png',{type:tipo}));
+    }
+    if(!arquivos.length){ showToast('warn','Não há imagem copiada'); return; }
+    extratoDeFoto(arquivos);
+  }catch(e){
+    showToast('warn','Não consegui colar. Copie o print de novo e tente.');
+  }
+}
+
 async function extratoDeArquivo(files){
   const f=files&&files[0]; if(!f) return;
   try{
@@ -2455,6 +2503,13 @@ function processarExtrato(linhas, origem){
     showToast('warn','Não encontrei transações nesse extrato');
     return;
   }
+  // Ao mandar vários prints rolando a tela, o mesmo trecho aparece duas vezes.
+  const vistas=new Set(); const repetidas=[];
+  linhas=linhas.filter(l=>{
+    const fp=fpLinha(l);
+    if(vistas.has(fp)){ repetidas.push(l); return false; }
+    vistas.add(fp); return true;
+  });
   // Se o extrato não marca os débitos (sem sinal e sem coluna D/C), não há o que
   // conciliar — melhor dizer isso do que mostrar "tudo em ordem" sem ter olhado.
   if(!linhas.some(l=>l.tipo==='D')){
@@ -2470,6 +2525,7 @@ function processarExtrato(linhas, origem){
   el.innerHTML=`
     <div class="divider"></div>
     <div style="font-size:12px;font-weight:700;margin-bottom:10px">${esc(origem)} · ${linhas.length} transações lidas</div>
+    ${repetidas.length?`<div class="ex-stat"><div style="color:var(--muted)">Linhas repetidas descartadas</div><div class="ex-num" style="color:var(--muted)">${repetidas.length}</div></div>`:''}
     <div class="ex-stat"><div>Débitos no extrato</div><div class="ex-num">${r.totalDebitos}</div></div>
     <div class="ex-stat"><div>✓ Já lançados</div><div class="ex-num" style="color:var(--green)">${r.casados.length}</div></div>
     <div class="ex-stat"><div>Não identificados</div><div class="ex-num" style="color:var(--yellow)">${r.novos.length}</div></div>
