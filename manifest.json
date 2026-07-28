@@ -5,12 +5,12 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0C0C10",
-  "theme_color": "#0C0C10",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%230C0C10'/><text y='130' x='96' text-anchor='middle' font-size='110'>💳</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23FFFFFF'/><rect x='28' y='28' width='136' height='136' rx='16' fill='none' stroke='%231E3A5F' stroke-width='8'/><path d='M60 128V84M92 128V60M124 128v-30' stroke='%231E3A5F' stroke-width='10' stroke-linecap='round' fill='none'/></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml"
     }
