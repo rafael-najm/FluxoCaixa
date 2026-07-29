@@ -72,6 +72,12 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   font-size:13px;font-weight:500;padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap;
   transition:all .12s;}
 .pchip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;font-weight:600;}
+.pchip-esc{color:var(--accent);border-color:var(--border);}
+.pe-lbl{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;}
+.pe-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.pe-op{padding:12px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--bg);
+  font-family:var(--ui);font-size:14px;font-weight:500;color:var(--text);cursor:pointer;transition:all .12s;}
+.pe-op:active{background:var(--s2);}
 
 .content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--bg-page);}
 .content.hidden{display:none;}
@@ -481,6 +487,53 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   </div>
 </div>
 
+<!-- MODAL PERÍODO -->
+<div class="mo" id="mo-periodo">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">Período</div>
+    <div class="mb">
+      <div class="note" style="margin-bottom:16px">Mostrando agora: <b id="pe-atual"></b></div>
+
+      <div class="pe-lbl">Atalhos</div>
+      <div class="pe-grid">
+        <button class="pe-op" onclick="aplicarAtalho('hoje')">Hoje</button>
+        <button class="pe-op" onclick="aplicarAtalho('ontem')">Ontem</button>
+        <button class="pe-op" onclick="aplicarAtalho('semana')">Últimos 7 dias</button>
+        <button class="pe-op" onclick="aplicarAtalho('mes')">Este mês</button>
+        <button class="pe-op" onclick="aplicarAtalho('mes_passado')">Mês passado</button>
+        <button class="pe-op" onclick="aplicarAtalho('trimestre')">Trimestre</button>
+        <button class="pe-op" onclick="aplicarAtalho('ano')">Este ano</button>
+        <button class="pe-op" onclick="aplicarAtalho('tudo')">Tudo</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="field">
+        <label>Um dia específico</label>
+        <input type="date" id="pe-dia"/>
+      </div>
+      <button class="btn-p btn-ghost" style="margin-top:0" onclick="aplicarDia()">Ver esse dia</button>
+
+      <div class="divider"></div>
+      <div class="field">
+        <label>Um mês específico</label>
+        <input type="month" id="pe-mes"/>
+      </div>
+      <button class="btn-p btn-ghost" style="margin-top:0" onclick="aplicarMes()">Ver esse mês</button>
+
+      <div class="divider"></div>
+      <div class="pe-lbl">De uma data até outra</div>
+      <div class="two-col">
+        <div class="field"><label>De</label><input type="date" id="pe-de"/></div>
+        <div class="field"><label>Até</label><input type="date" id="pe-ate"/></div>
+      </div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="aplicarIntervalo()">Ver esse período</button>
+
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-periodo')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL EXTRATO -->
 <div class="mo" id="mo-extrato">
   <div class="ms">
@@ -812,25 +865,55 @@ function calcDataRec(tipo, maq){
 }
 
 // ── PERIOD FILTER ──
+// Data local em texto. Não usar toISOString aqui: ela converte para UTC e
+// pode devolver o dia anterior dependendo do fuso.
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const ehData = v => /^\d{4}-\d{2}-\d{2}$/.test(v||'');
+const primeiroDia = (y,m) => ymd(new Date(y,m,1));
+const ultimoDia   = (y,m) => ymd(new Date(y,m+1,0));
+
 function getPeriodRange(){
   const now = new Date(); const y=now.getFullYear(); const m=now.getMonth();
-  if(filter.period==='hoje'){ const s=today(); return[s,s]; }
-  if(filter.period==='semana'){
-    const d=new Date(); d.setDate(d.getDate()-6);
-    return[d.toISOString().split('T')[0], today()];
+  const p=filter.period;
+  if(p==='hoje'){ const s=today(); return[s,s]; }
+  if(p==='ontem'){ const d=new Date(); d.setDate(d.getDate()-1); const s=ymd(d); return[s,s]; }
+  if(p==='semana'){ const d=new Date(); d.setDate(d.getDate()-6); return[ymd(d), today()]; }
+  if(p==='mes')          return[primeiroDia(y,m), ultimoDia(y,m)];
+  if(p==='mes_passado')  return[primeiroDia(y,m-1), ultimoDia(y,m-1)];
+  if(p==='trimestre'){ const q=Math.floor(m/3); return[primeiroDia(y,q*3), ultimoDia(y,q*3+2)]; }
+  if(p==='ano')          return[`${y}-01-01`,`${y}-12-31`];
+  // Escolhas do próprio usuário, com defesa contra valor inválido no storage.
+  if(p==='dia' && ehData(filter.dia)) return[filter.dia, filter.dia];
+  if(p==='mesx' && /^\d{4}-\d{2}$/.test(filter.mes||'')){
+    const [my,mm]=filter.mes.split('-').map(Number);
+    return[primeiroDia(my,mm-1), ultimoDia(my,mm-1)];
   }
-  if(filter.period==='mes'){
-    const s=new Date(y,m,1).toISOString().split('T')[0];
-    const e=new Date(y,m+1,0).toISOString().split('T')[0];
-    return[s,e];
+  if(p==='custom' && ehData(filter.de) && ehData(filter.ate)){
+    return filter.de<=filter.ate ? [filter.de,filter.ate] : [filter.ate,filter.de];
   }
-  if(filter.period==='trimestre'){
-    const q=Math.floor(m/3); const s=new Date(y,q*3,1).toISOString().split('T')[0];
-    const e=new Date(y,q*3+3,0).toISOString().split('T')[0]; return[s,e];
-  }
-  if(filter.period==='ano'){ return[`${y}-01-01`,`${y}-12-31`]; }
   return['2000-01-01','2099-12-31'];
 }
+
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+// Texto curto do período ativo, para a barra e para o saldo.
+function labelPeriodo(){
+  const p=filter.period;
+  const fixo={hoje:'Hoje',ontem:'Ontem',semana:'7 dias',mes:'Este mês',mes_passado:'Mês passado',
+              trimestre:'Trimestre',ano:'Ano',tudo:'Tudo'}[p];
+  if(fixo) return fixo;
+  if(p==='dia' && ehData(filter.dia)) return fmtDateFull(filter.dia);
+  if(p==='mesx' && /^\d{4}-\d{2}$/.test(filter.mes||'')){
+    const [my,mm]=filter.mes.split('-').map(Number);
+    return `${MESES[mm-1]} de ${my}`;
+  }
+  if(p==='custom' && ehData(filter.de) && ehData(filter.ate)){
+    const [a,b]=getPeriodRange();
+    return `${fmtDateFull(a)} a ${fmtDateFull(b)}`;
+  }
+  return 'Tudo';
+}
+// As escolhas livres não têm chip fixo na barra.
+const periodoLivre = () => ['dia','mesx','custom','ontem','mes_passado'].includes(filter.period);
 
 function filterLanc(arr){
   const [s,e] = getPeriodRange();
@@ -846,11 +929,45 @@ function filterLanc(arr){
 // ══════════════════════════════════════════════════
 const PERIODS=[{k:'hoje',l:'Hoje'},{k:'semana',l:'7 dias'},{k:'mes',l:'Este mês'},{k:'trimestre',l:'Trimestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Tudo'}];
 function renderPeriodBar(){
-  document.getElementById('period-bar').innerHTML = PERIODS.map(p=>
-    `<button class="pchip${filter.period===p.k?' active':''}" onclick="setPeriod('${p.k}')">${p.l}</button>`
-  ).join('');
+  const livre=periodoLivre();
+  document.getElementById('period-bar').innerHTML =
+    (livre?`<button class="pchip active" onclick="openPeriodo()">${esc(labelPeriodo())}</button>`:'')
+    + PERIODS.map(p=>
+      `<button class="pchip${filter.period===p.k?' active':''}" onclick="setPeriod('${p.k}')">${p.l}</button>`
+    ).join('')
+    + `<button class="pchip pchip-esc" onclick="openPeriodo()">Escolher…</button>`;
 }
 function setPeriod(p){ filter.period=p; save(); renderPeriodBar(); renderPage(currentTab); }
+
+// ── ESCOLHER PERÍODO ──
+function openPeriodo(){
+  const hoje=today();
+  document.getElementById('pe-dia').value = ehData(filter.dia)?filter.dia:hoje;
+  document.getElementById('pe-mes').value = /^\d{4}-\d{2}$/.test(filter.mes||'')?filter.mes:hoje.slice(0,7);
+  document.getElementById('pe-de').value  = ehData(filter.de)?filter.de:hoje.slice(0,8)+'01';
+  document.getElementById('pe-ate').value = ehData(filter.ate)?filter.ate:hoje;
+  document.getElementById('pe-atual').textContent=labelPeriodo();
+  openMo('mo-periodo');
+}
+function aplicarAtalho(k){ setPeriod(k); closeMo('mo-periodo'); showToast('ok',labelPeriodo()); }
+function aplicarDia(){
+  const v=document.getElementById('pe-dia').value;
+  if(!ehData(v)){ showToast('warn','Escolha um dia'); return; }
+  filter.period='dia'; filter.dia=v; save(); renderPeriodBar(); renderPage(currentTab);
+  closeMo('mo-periodo'); showToast('ok',labelPeriodo());
+}
+function aplicarMes(){
+  const v=document.getElementById('pe-mes').value;
+  if(!/^\d{4}-\d{2}$/.test(v)){ showToast('warn','Escolha um mês'); return; }
+  filter.period='mesx'; filter.mes=v; save(); renderPeriodBar(); renderPage(currentTab);
+  closeMo('mo-periodo'); showToast('ok',labelPeriodo());
+}
+function aplicarIntervalo(){
+  const de=document.getElementById('pe-de').value, ate=document.getElementById('pe-ate').value;
+  if(!ehData(de)||!ehData(ate)){ showToast('warn','Preencha as duas datas'); return; }
+  filter.period='custom'; filter.de=de; filter.ate=ate; save(); renderPeriodBar(); renderPage(currentTab);
+  closeMo('mo-periodo'); showToast('ok',labelPeriodo());
+}
 
 // ══════════════════════════════════════════════════
 // TABS
@@ -965,9 +1082,9 @@ function renderHome(){
   </div>
 
   <div class="hero">
-    <div class="hero-lbl">Saldo do Período · ${unitLabel}</div>
+    <div class="hero-lbl">${esc(labelPeriodo())} · ${esc(unitLabel)}</div>
     <div class="hero-val ${saldo>=0?'pos':'neg'}">${fmt(saldo)}</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:5px">${data.length} lançamentos</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:5px">${data.length} lançamento${data.length===1?'':'s'} · <span style="color:var(--accent);font-weight:500" onclick="openPeriodo()">trocar período</span></div>
     <div class="hero-grid">
       <div class="hg-item"><div class="hg-lbl">Entradas</div><div class="hg-val" style="color:var(--green)">${fmt(totalIn)}</div></div>
       <div class="hg-item"><div class="hg-lbl">Saídas</div><div class="hg-val" style="color:var(--red)">${fmt(totalOut)}</div></div>
@@ -1060,7 +1177,8 @@ function rowHTML(l){
 
 function renderLancamentos(){
   const data=[...filterLanc(lancamentos)].sort((a,b)=>b.data.localeCompare(a.data));
-  let html=`<div class="sh" style="margin-top:4px"><div class="st">Lançamentos</div><div style="display:flex;gap:8px">
+  let html=`<div style="font-size:12px;color:var(--muted);margin:2px 0 8px">${esc(labelPeriodo())}</div>
+  <div class="sh" style="margin-top:0"><div class="st">Lançamentos</div><div style="display:flex;gap:8px">
     <div class="sa" onclick="openLanc('in')">Nova entrada</div>
     <div class="sa" onclick="openLanc('out')">Nova saída</div>
   </div></div>`;
@@ -1123,8 +1241,9 @@ function renderRelatorio(){
   data.filter(l=>l.maq_id).forEach(l=>{ byMaq[l.maq_id]=(byMaq[l.maq_id]||0)+l.valor; });
 
   let html=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px">
+  <div style="margin:4px 0 14px">
     <div class="st">Relatório Financeiro</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(labelPeriodo())} · ${esc(filter.unit==='all'?'Todas as unidades':getUnit(filter.unit).name)}</div>
   </div>
 
   ${blocoDRE()}
