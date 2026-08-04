@@ -295,6 +295,52 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 .dre-pct{font-size:11px;color:var(--muted);font-weight:500;}
 .dre-nota{font-size:11px;color:var(--muted);line-height:1.55;padding:8px 14px;}
 
+/* ── ASSISTENTE ── */
+.chat-ms{height:92dvh;display:flex;flex-direction:column;padding-bottom:0;}
+.chat-top{display:flex;align-items:center;gap:8px;padding:0 16px 12px;border-bottom:1px solid var(--border);}
+.chat-titulo{font-size:17px;font-weight:600;flex:1;letter-spacing:-.01em;}
+.chat-x{background:none;border:none;color:var(--muted);font-family:var(--ui);font-size:13px;cursor:pointer;padding:6px;}
+.chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.chat-b{max-width:86%;padding:11px 13px;border-radius:12px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+.chat-eu{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px;}
+.chat-ia{align-self:flex-start;background:var(--s2);color:var(--text);border-bottom-left-radius:4px;}
+.chat-pensando{display:flex;gap:4px;align-items:center;padding:14px 13px;}
+.chat-pensando span{width:6px;height:6px;border-radius:50%;background:var(--muted2);animation:pulsa 1.2s infinite;}
+.chat-pensando span:nth-child(2){animation-delay:.2s}
+.chat-pensando span:nth-child(3){animation-delay:.4s}
+@keyframes pulsa{0%,60%,100%{opacity:.3}30%{opacity:1}}
+.chat-acoes{align-self:flex-start;max-width:92%;background:var(--bg);border:1px solid var(--border2);
+  border-left:2px solid var(--accent);border-radius:10px;padding:12px 13px;}
+.chat-acoes-t{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.chat-ac-item{font-size:13px;color:var(--text);line-height:1.5;padding:3px 0;}
+.chat-ac-btn{flex:1;padding:9px;white-space:nowrap;border-radius:7px;border:1px solid var(--border2);background:var(--bg);
+  font-family:var(--ui);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;}
+.chat-ac-btn.ok{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
+.chat-ac-ok{font-size:12px;color:var(--green);font-weight:500;margin-top:8px;}
+.chat-res{align-self:flex-start;max-width:92%;font-size:12px;color:var(--green);line-height:1.6;padding:0 4px;}
+.chat-bar{display:flex;gap:8px;align-items:flex-end;padding:10px 12px;
+  padding-bottom:calc(10px + var(--safe-b));border-top:1px solid var(--border);background:var(--bg);}
+.chat-bar textarea{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:10px;
+  padding:11px 12px;font-family:var(--ui);font-size:16px;color:var(--text);outline:none;resize:none;
+  max-height:110px;line-height:1.4;}
+.chat-bar textarea:focus{border-color:var(--accent);}
+.chat-send{width:42px;height:42px;border-radius:10px;background:var(--accent);color:#fff;border:none;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.chat-send:active{opacity:.8;}
+.chat-vazio{margin:auto 0;text-align:center;padding:20px 4px;}
+.chat-vazio-t{font-size:14px;color:var(--muted);margin-bottom:16px;}
+.chat-sug{display:flex;flex-direction:column;gap:8px;}
+.chat-sug-b{padding:11px 13px;border:1px solid var(--border2);border-radius:9px;background:var(--bg);
+  font-family:var(--ui);font-size:13.5px;color:var(--text);cursor:pointer;text-align:left;}
+.chat-sug-b:active{background:var(--s2);}
+.onb{background:var(--accent);border-radius:10px;padding:16px;margin-bottom:16px;color:#fff;}
+.onb-t{font-size:15px;font-weight:600;margin-bottom:5px;}
+.onb-s{font-size:12.5px;line-height:1.55;opacity:.85;margin-bottom:12px;}
+.onb-b{width:100%;padding:11px;border-radius:8px;border:none;background:#fff;color:var(--accent);
+  font-family:var(--ui);font-size:14px;font-weight:600;cursor:pointer;}
+.onb-x{background:none;border:none;color:#fff;opacity:.7;font-family:var(--ui);font-size:12px;
+  cursor:pointer;padding:8px;width:100%;margin-top:2px;}
+
 /* ── EXTRATO ── */
 .ex-stat{display:flex;justify-content:space-between;align-items:center;padding:11px 0;
   border-bottom:1px solid var(--border);font-size:13px;color:var(--text2);}
@@ -335,6 +381,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 8h.01"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13 5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18l-1.8-5.4L4.5 10.8 10.2 9z"/></symbol>
   <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M16 9.5l4 5M20 9.5l-4 5"/></symbol>
 </defs></svg>
 <div id="app">
@@ -342,6 +390,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   <div class="hdr">
     <div class="hdr-logo">Fluxo<span>Caixa</span></div>
     <div class="hdr-right">
+      <div class="hdr-btn" onclick="openChat()" aria-label="Assistente"><svg class="ic"><use href="#i-chat"/></svg></div>
       <div class="hdr-btn" id="hdr-unit-btn" onclick="openUnitPicker()" aria-label="Unidade"><svg class="ic"><use href="#i-store"/></svg></div>
       <div class="hdr-btn" onclick="location.reload()" aria-label="Atualizar"><svg class="ic"><use href="#i-refresh"/></svg></div>
     </div>
@@ -487,6 +536,24 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   </div>
 </div>
 
+<!-- MODAL ASSISTENTE -->
+<div class="mo" id="mo-chat">
+  <div class="ms chat-ms">
+    <div class="mh"></div>
+    <div class="chat-top">
+      <div class="chat-titulo">Assistente</div>
+      <button class="chat-x" onclick="limparChat()">Limpar</button>
+      <button class="chat-x" onclick="closeMo('mo-chat')">Fechar</button>
+    </div>
+    <div class="chat-msgs" id="chat-msgs"></div>
+    <div class="chat-bar">
+      <textarea id="chat-input" rows="1" placeholder="Escreva sua pergunta ou peça uma mudança"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mandarChat();}"></textarea>
+      <button class="chat-send" onclick="mandarChat()" aria-label="Enviar"><svg class="ic"><use href="#i-arrow-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL PERÍODO -->
 <div class="mo" id="mo-periodo">
   <div class="ms">
@@ -595,7 +662,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 // ══════════════════════════════════════════════════
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
 const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1', SK_R = 'fc_revisao_v1';
-const SK_EX = 'fc_extrato_v1';
+const SK_EX = 'fc_extrato_v1', SK_CHAT = 'fc_chat_v1', SK_ONB = 'fc_onboard_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
 const CAT_IN = [
@@ -678,6 +745,8 @@ let revisao  = JSON.parse(localStorage.getItem(SK_R)||'[]');
 // Linhas de extrato já resolvidas (lançadas ou ignoradas), para não perguntar de novo
 // quando ele importar um extrato com período sobreposto.
 let extratoVistos = JSON.parse(localStorage.getItem(SK_EX)||'{}');
+let chatHist = JSON.parse(localStorage.getItem(SK_CHAT)||'[]');
+let jaConfigurou = localStorage.getItem(SK_ONB)==='1';
 
 let currentTab = 'home';
 let uploadType = 'auto';
@@ -699,6 +768,7 @@ function save(){
     localStorage.setItem(SK_FX,JSON.stringify(fixas));
     localStorage.setItem(SK_R,JSON.stringify(revisao));
     localStorage.setItem(SK_EX,JSON.stringify(extratoVistos));
+    localStorage.setItem(SK_CHAT,JSON.stringify(chatHist.slice(-40)));
     return true;
   }catch(e){
     // Última tentativa: grava tudo sem as fotos, que é o que ocupa espaço.
@@ -736,8 +806,10 @@ async function idbTx(mode,fn){
     return await new Promise((res,rej)=>{
       const tx=db.transaction(IDB_STORE,mode);
       const st=tx.objectStore(IDB_STORE);
-      const out=fn(st);
-      tx.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);
+      const rq=fn(st);
+      // Chave ausente devolve result undefined; sem isso o objeto da própria
+      // requisição escapava como se fosse a foto.
+      tx.oncomplete=()=>res(rq && ('result' in rq) ? rq.result : undefined);
       tx.onerror=()=>rej(tx.error);
     });
   }catch(e){ return null; }
@@ -1074,7 +1146,16 @@ function renderHome(){
 
   const unitLabel = filter.unit==='all'?'Todas as unidades':getUnit(filter.unit).name;
 
-  let html = `
+  let html = '';
+  if(precisaConfigurar()){
+    html += `<div class="onb">
+      <div class="onb-t">Vamos deixar o app com a sua cara</div>
+      <div class="onb-s">Me conte sobre o seu negócio numa conversa e eu configuro tudo: suas lojas, as maquininhas com as taxas de verdade, os sócios e as contas que se repetem todo mês.</div>
+      <button class="onb-b" onclick="comecarOnboarding()">Configurar conversando</button>
+      <button class="onb-x" onclick="marcarConfigurado()">Depois eu faço na mão</button>
+    </div>`;
+  }
+  html += `
   <div class="install-b" id="ib">
     <div style="color:var(--accent);display:flex"><svg class="ic"><use href="#i-info"/></svg></div>
     <div style="flex:1"><div style="font-size:12px;font-weight:700">Adicionar à tela inicial</div><div style="font-size:10px;color:var(--muted)">No Safari: Compartilhar → “Adicionar à Tela de Início”</div></div>
@@ -2547,8 +2628,464 @@ async function handleFiles(files){
 }
 
 // ══════════════════════════════════════════════════
+// ASSISTENTE
+// ══════════════════════════════════════════════════
+// Retrato do sistema que vai junto com a pergunta. Configuração inteira (é
+// pequena) e os números já somados, em vez da lista crua de lançamentos.
+function estadoParaIA(){
+  const porMes={};
+  lancamentos.forEach(l=>{
+    const m=mesDe(l.data); if(!m) return;
+    porMes[m]=porMes[m]||{entradas:0,saidas:0};
+    if(l.tipo==='in') porMes[m].entradas+=(l.valor_liquido||l.valor||0);
+    else porMes[m].saidas+=(l.valor||0);
+  });
+  const meses=Object.keys(porMes).sort().slice(-12);
+  const porMes12={}; meses.forEach(m=>porMes12[m]={
+    entradas:+porMes[m].entradas.toFixed(2), saidas:+porMes[m].saidas.toFixed(2)});
+
+  const doPeriodo=filterLanc(lancamentos);
+  const porCat={};
+  doPeriodo.filter(l=>l.tipo==='out').forEach(l=>{
+    porCat[l.cat]=+(((porCat[l.cat]||0)+(l.valor||0)).toFixed(2));
+  });
+  const porForn={};
+  doPeriodo.filter(l=>l.tipo==='out'&&norm(l.forn)).forEach(l=>{
+    porForn[l.forn]=+(((porForn[l.forn]||0)+(l.valor||0)).toFixed(2));
+  });
+
+  return {
+    hoje:today(),
+    periodo_selecionado:{rotulo:labelPeriodo(), de:getPeriodRange()[0], ate:getPeriodRange()[1]},
+    unidade_selecionada: filter.unit==='all'?'todas':getUnit(filter.unit).name,
+    unidades: units.map(u=>({id:u.id,nome:u.name})),
+    maquinas: maquinas.map(m=>({id:m.id,nome:m.name,unidade:m.unit,
+      taxa_debito:m.taxa_debito,taxa_credito_1x:m.taxa_credito_1x,
+      taxa_credito_2_6x:m.taxa_credito_2_6x,taxa_credito_7x:m.taxa_credito_7x,
+      prazo_debito:m.prazo_debito,prazo_credito:m.prazo_credito})),
+    socios: socios.map(s=>({id:s.id,nome:s.name})),
+    contas_fixas: fixas.map(f=>({id:f.id,descricao:f.desc,valor:f.valor,
+      categoria:f.cat,unidade:f.unit,dia_vencimento:f.dia})),
+    categorias_saida: catsOut().map(c=>({id:c.id,nome:c.label})),
+    categorias_entrada: CAT_IN.map(c=>({id:c.id,nome:c.label})),
+    totais:{
+      lancamentos_no_total: lancamentos.length,
+      no_periodo_selecionado: doPeriodo.length,
+      por_mes: porMes12,
+      saidas_por_categoria_no_periodo: porCat,
+      saidas_por_fornecedor_no_periodo: porForn,
+      dre_do_periodo: calcularDRE(filter.regime||'competencia'),
+    },
+    despesas_parceladas_abertas: compsAbertos().map(c=>({id:c.id,descricao:c.desc,
+      total:c.valor_total,pago:compPago(c.id),falta:compSaldo(c),fornecedor:c.forn})),
+    comprovantes_aguardando_conferencia: revisao.length,
+    ultimos_lancamentos: [...lancamentos].sort((a,b)=>(b.data||'').localeCompare(a.data||''))
+      .slice(0,30).map(l=>({data:l.data,vencimento:l.data_venc||null,tipo:l.tipo,
+        valor:l.valor,categoria:l.cat,descricao:l.desc,fornecedor:l.forn||null,unidade:l.unit})),
+  };
+}
+
+// ── AÇÕES ──
+// Vocabulário fechado. Cada ação valida os próprios campos; id inexistente ou
+// número fora da faixa é recusado, para a IA não corromper a configuração.
+const num = (v,min,max) => {
+  const n=typeof v==='string'?parseValorBR(v):Number(v);
+  if(isNaN(n)||n<min||n>max) return null;
+  return n;
+};
+const txt = v => (typeof v==='string'&&v.trim())?v.trim().slice(0,80):null;
+
+const ROTULO_CAMPO={taxa_debito:'taxa débito',taxa_credito_1x:'taxa crédito 1x',
+  taxa_credito_2_6x:'taxa crédito 2–6x',taxa_credito_7x:'taxa crédito 7x+',
+  prazo_debito:'prazo débito',prazo_credito:'prazo crédito',nome:'nome',unidade:'unidade',
+  descricao:'descrição',valor:'valor',categoria:'categoria',dia_vencimento:'vencimento'};
+const pctTxt = v => String(v).replace('.',',')+'%';
+// Descreve a mudança campo a campo, mostrando o valor de agora e o proposto.
+function difCampos(a, atual, fmtCampo){
+  const p=[];
+  for(const [k,rot] of Object.entries(ROTULO_CAMPO)){
+    if(a[k]===undefined||a[k]===null) continue;
+    const de=atual?atual[k]:undefined;
+    const novo=fmtCampo?fmtCampo(k,a[k]):a[k];
+    const velho=(de===undefined||de===null)?null:(fmtCampo?fmtCampo(k,de):de);
+    p.push(velho!==null&&String(velho)!==String(novo) ? `${rot} ${velho} → ${novo}` : `${rot} ${novo}`);
+  }
+  return p;
+}
+const fmtMaqCampo=(k,v)=>k.startsWith('taxa')?pctTxt(v):(k.startsWith('prazo')?v+' dias':v);
+
+const ACOES={
+  criar_unidade:{
+    desc:a=>`Criar unidade "${a.nome}"`,
+    run:a=>{ const n=txt(a.nome); if(!n) throw new Error('nome inválido');
+      if(units.some(u=>norm(u.name)===norm(n))) throw new Error('já existe unidade com esse nome');
+      units.push({id:'u'+Date.now()+units.length,name:n}); return `Unidade "${n}" criada`; }},
+  renomear_unidade:{
+    desc:a=>{ const u=units.find(x=>x.id===a.id);
+      return u?`Renomear "${u.name}" para "${a.nome}"`:`Renomear unidade para "${a.nome}"`; },
+    run:a=>{ const u=units.find(x=>x.id===a.id); if(!u) throw new Error('unidade não encontrada');
+      const n=txt(a.nome); if(!n) throw new Error('nome inválido');
+      const velho=u.name; u.name=n; return `Unidade "${velho}" agora é "${n}"`; }},
+  remover_unidade:{
+    desc:a=>{ const u=units.find(x=>x.id===a.id); return `Remover a unidade "${u?u.name:a.id}"`; },
+    run:a=>{ const u=units.find(x=>x.id===a.id); if(!u) throw new Error('unidade não encontrada');
+      if(lancamentos.some(l=>l.unit===a.id)) throw new Error(`"${u.name}" tem lançamentos e não pode ser removida`);
+      if(units.length<=1) throw new Error('precisa sobrar ao menos uma unidade');
+      units=units.filter(x=>x.id!==a.id); return `Unidade "${u.name}" removida`; }},
+
+  criar_maquina:{
+    desc:a=>{ const u=units.find(x=>x.id===a.unidade);
+      return `Criar a maquininha "${a.nome}"${u?' em '+u.name:''} — débito ${pctTxt(a.taxa_debito)}, crédito ${pctTxt(a.taxa_credito_1x)}, recebe em ${a.prazo_credito??30} dias`; },
+    run:a=>{ const n=txt(a.nome); if(!n) throw new Error('nome inválido');
+      const un=units.find(u=>u.id===a.unidade); if(!un) throw new Error('unidade não encontrada');
+      const m={id:'m'+Date.now()+maquinas.length,name:n,unit:un.id,
+        taxa_debito:num(a.taxa_debito,0,100)??1.5,
+        taxa_credito_1x:num(a.taxa_credito_1x,0,100)??3,
+        taxa_credito_2_6x:num(a.taxa_credito_2_6x,0,100)??num(a.taxa_credito_1x,0,100)??3.8,
+        taxa_credito_7x:num(a.taxa_credito_7x,0,100)??num(a.taxa_credito_1x,0,100)??4.5,
+        prazo_debito:num(a.prazo_debito,0,180)??1,
+        prazo_credito:num(a.prazo_credito,0,180)??30,
+        cor:SOCIO_CORES[maquinas.length%SOCIO_CORES.length]};
+      maquinas.push(m); return `Maquininha "${n}" criada em ${un.name}`; }},
+  editar_maquina:{
+    desc:a=>{ const m=getMaq(a.id);
+      const campos={...a}; if(campos.unidade){ const u=units.find(x=>x.id===campos.unidade); if(u) campos.unidade=u.name; }
+      const atual=m?{taxa_debito:m.taxa_debito,taxa_credito_1x:m.taxa_credito_1x,
+        taxa_credito_2_6x:m.taxa_credito_2_6x,taxa_credito_7x:m.taxa_credito_7x,
+        prazo_debito:m.prazo_debito,prazo_credito:m.prazo_credito,nome:m.name}:null;
+      const p=difCampos(campos,atual,fmtMaqCampo);
+      return `${m?m.name:'Maquininha'}: ${p.join(', ')||'sem mudança'}`; },
+    run:a=>{ const m=getMaq(a.id); if(!m) throw new Error('maquininha não encontrada');
+      const campos={nome:'name',taxa_debito:'taxa_debito',taxa_credito_1x:'taxa_credito_1x',
+        taxa_credito_2_6x:'taxa_credito_2_6x',taxa_credito_7x:'taxa_credito_7x',
+        prazo_debito:'prazo_debito',prazo_credito:'prazo_credito',unidade:'unit'};
+      const mudou=[];
+      for(const [k,prop] of Object.entries(campos)){
+        if(a[k]===undefined||a[k]===null) continue;
+        if(k==='nome'){ const n=txt(a[k]); if(n){ m.name=n; mudou.push('nome'); } }
+        else if(k==='unidade'){ if(units.some(u=>u.id===a[k])){ m.unit=a[k]; mudou.push('unidade'); } }
+        else {
+          const lim=k.startsWith('prazo')?180:100;
+          const v=num(a[k],0,lim);
+          if(v===null) throw new Error(`${k} fora da faixa`);
+          m[prop]=v; mudou.push(k.replace(/_/g,' '));
+        }
+      }
+      if(!mudou.length) throw new Error('nada para mudar');
+      return `"${m.name}": ${mudou.join(', ')} atualizado`; }},
+  remover_maquina:{
+    desc:a=>{ const m=getMaq(a.id); return `Remover a maquininha "${m?m.name:a.id}"`; },
+    run:a=>{ const m=getMaq(a.id); if(!m) throw new Error('maquininha não encontrada');
+      if(lancamentos.some(l=>l.maq_id===a.id)) throw new Error(`"${m.name}" tem vendas registradas`);
+      maquinas=maquinas.filter(x=>x.id!==a.id); return `Maquininha "${m.name}" removida`; }},
+
+  criar_socio:{
+    desc:a=>`Criar sócio "${a.nome}"`,
+    run:a=>{ const n=txt(a.nome); if(!n) throw new Error('nome inválido');
+      if(socios.some(x=>norm(x.name)===norm(n))) throw new Error('já existe sócio com esse nome');
+      socios.push({id:'s'+Date.now()+socios.length,name:n}); return `Sócio "${n}" criado`; }},
+  renomear_socio:{
+    desc:a=>{ const x=getSocio(a.id);
+      return x?`Renomear o sócio "${x.name}" para "${a.nome}"`:`Renomear sócio para "${a.nome}"`; },
+    run:a=>{ const x=getSocio(a.id); if(!x) throw new Error('sócio não encontrado');
+      const n=txt(a.nome); if(!n) throw new Error('nome inválido');
+      const velho=x.name; x.name=n; return `Sócio "${velho}" agora é "${n}"`; }},
+  remover_socio:{
+    desc:a=>{ const x=getSocio(a.id); return `Remover o sócio "${x?x.name:a.id}"`; },
+    run:a=>{ const x=getSocio(a.id); if(!x) throw new Error('sócio não encontrado');
+      if(lancamentos.some(l=>l.cat===catSocioId(a.id))) throw new Error(`"${x.name}" tem retiradas registradas`);
+      socios=socios.filter(y=>y.id!==a.id); return `Sócio "${x.name}" removido`; }},
+
+  criar_conta_fixa:{
+    desc:a=>`Criar conta fixa "${a.descricao}" de ${fmt(num(a.valor,0,1e9)||0)}`,
+    run:a=>{ const d=txt(a.descricao); if(!d) throw new Error('descrição inválida');
+      const v=num(a.valor,0.01,1e9); if(v===null) throw new Error('valor inválido');
+      if(!getCatValida(a.categoria,'out')) throw new Error('categoria inválida');
+      const un=units.find(u=>u.id===a.unidade); if(!un) throw new Error('unidade não encontrada');
+      const dia=num(a.dia_vencimento,1,31);
+      fixas.push({id:'f'+Date.now()+fixas.length,desc:d,valor:v,cat:a.categoria,unit:un.id,dia:dia||null});
+      return `Conta fixa "${d}" (${fmt(v)}/mês) criada`; }},
+  editar_conta_fixa:{
+    desc:a=>{ const f=getFixa(a.id);
+      const campos={...a};
+      if(campos.valor!==undefined) campos.valor=fmt(num(campos.valor,0,1e9)||0);
+      if(campos.categoria) campos.categoria=getCat(campos.categoria).label;
+      if(campos.unidade){ const u=units.find(x=>x.id===campos.unidade); if(u) campos.unidade=u.name; }
+      const atual=f?{descricao:f.desc,valor:fmt(f.valor),categoria:getCat(f.cat).label,dia_vencimento:f.dia}:null;
+      const p=difCampos(campos,atual);
+      return `${f?f.desc:'Conta fixa'}: ${p.join(', ')||'sem mudança'}`; },
+    run:a=>{ const f=getFixa(a.id); if(!f) throw new Error('conta fixa não encontrada');
+      const mudou=[];
+      if(a.descricao!==undefined){ const d=txt(a.descricao); if(d){ f.desc=d; mudou.push('descrição'); } }
+      if(a.valor!==undefined){ const v=num(a.valor,0.01,1e9); if(v===null) throw new Error('valor inválido'); f.valor=v; mudou.push('valor'); }
+      if(a.categoria!==undefined){ if(!getCatValida(a.categoria,'out')) throw new Error('categoria inválida'); f.cat=a.categoria; mudou.push('categoria'); }
+      if(a.unidade!==undefined){ if(!units.some(u=>u.id===a.unidade)) throw new Error('unidade não encontrada'); f.unit=a.unidade; mudou.push('unidade'); }
+      if(a.dia_vencimento!==undefined){ const d=num(a.dia_vencimento,1,31); if(d===null) throw new Error('dia inválido'); f.dia=d; mudou.push('vencimento'); }
+      if(!mudou.length) throw new Error('nada para mudar');
+      return `"${f.desc}": ${mudou.join(', ')} atualizado`; }},
+  remover_conta_fixa:{
+    desc:a=>{ const f=getFixa(a.id); return `Remover a conta fixa "${f?f.desc:a.id}"`; },
+    run:a=>{ const f=getFixa(a.id); if(!f) throw new Error('conta fixa não encontrada');
+      fixas=fixas.filter(x=>x.id!==a.id);
+      lancamentos.forEach(l=>{ if(l.fixa_id===a.id) l.fixa_id=null; });
+      return `Conta fixa "${f.desc}" removida`; }},
+
+  criar_lancamento:{
+    desc:a=>`Lançar ${a.tipo==='in'?'entrada':'saída'} de ${fmt(num(a.valor,0,1e9)||0)} — ${a.descricao||''}`,
+    run:a=>{ const tipo=a.tipo==='in'?'in':'out';
+      const v=num(a.valor,0.01,1e9); if(v===null) throw new Error('valor inválido');
+      if(!getCatValida(a.categoria,tipo)) throw new Error('categoria inválida para esse tipo');
+      const un=units.find(u=>u.id===a.unidade)||units[0]; if(!un) throw new Error('nenhuma unidade cadastrada');
+      const data=ehData(a.data)?a.data:today();
+      const maq=tipo==='in'?getMaq(a.maquina):null;
+      const pag=['debito','credito_1x','credito_2_6x','credito_7x','pix'].includes(a.forma_pagamento)?a.forma_pagamento:(tipo==='in'?'pix':null);
+      lancamentos.unshift({
+        id:Date.now()+''+Math.floor(Math.random()*100000),
+        tipo, cat:a.categoria, valor:v,
+        valor_liquido:tipo==='in'?calcLiquido(v,pag,maq):v,
+        val_bruto:tipo==='in'?v:null,
+        maq_id:maq?maq.id:null, pagtype:tipo==='in'?pag:null,
+        data, data_venc:tipo==='out'&&ehData(a.vencimento)?a.vencimento:null,
+        data_rec:tipo==='in'?calcDataRec(pag,maq):null,
+        desc:txt(a.descricao)||getCat(a.categoria).label,
+        forn:txt(a.fornecedor)||'', obs:'', unit:un.id,
+        comp_id:null, fixa_id:null,
+      });
+      return `${tipo==='in'?'Entrada':'Saída'} de ${fmt(v)} lançada`; }},
+
+  definir_periodo:{
+    desc:a=>{ const guarda={...filter};
+      try{ ACOES.definir_periodo.run(a); const l=labelPeriodo(); Object.assign(filter,guarda);
+        return `Mostrar o período: ${l}`; }
+      catch(e){ Object.assign(filter,guarda); return 'Mudar o período exibido'; } },
+    run:a=>{ const p=a.periodo;
+      const fixos=['hoje','ontem','semana','mes','mes_passado','trimestre','ano','tudo'];
+      if(fixos.includes(p)){ filter.period=p; }
+      else if(p==='dia'&&ehData(a.dia)){ filter.period='dia'; filter.dia=a.dia; }
+      else if(p==='mesx'&&/^\d{4}-\d{2}$/.test(a.mes||'')){ filter.period='mesx'; filter.mes=a.mes; }
+      else if(p==='custom'&&ehData(a.de)&&ehData(a.ate)){ filter.period='custom'; filter.de=a.de; filter.ate=a.ate; }
+      else throw new Error('período inválido');
+      return `Período: ${labelPeriodo()}`; }},
+  definir_unidade_exibida:{
+    desc:a=>{ if(a.unidade==='all'||!a.unidade) return 'Mostrar todas as unidades';
+      const u=units.find(x=>x.id===a.unidade); return `Mostrar só ${u?u.name:a.unidade}`; },
+    run:a=>{ if(a.unidade==='all'||!a.unidade){ filter.unit='all'; return 'Mostrando todas as unidades'; }
+      const u=units.find(x=>x.id===a.unidade); if(!u) throw new Error('unidade não encontrada');
+      filter.unit=u.id; return `Mostrando só ${u.name}`; }},
+};
+
+function descreverAcao(a){
+  const def=ACOES[a&&a.acao];
+  if(!def) return `Ação desconhecida: ${a&&a.acao}`;
+  try{ return def.desc(a); }catch(e){ return a.acao; }
+}
+
+// Aplica em bloco e devolve o que deu certo e o que falhou, sem interromper
+// as demais quando uma dá erro.
+function aplicarAcoes(acoes){
+  const feitos=[], erros=[];
+  (acoes||[]).forEach(a=>{
+    const def=ACOES[a&&a.acao];
+    if(!def){ erros.push(`Ação desconhecida: ${a&&a.acao}`); return; }
+    try{ feitos.push(def.run(a)); }
+    catch(e){ erros.push(`${a.acao}: ${e.message}`); }
+  });
+  if(feitos.length) save();
+  return {feitos,erros};
+}
+
+
+// ── CONVERSA ──
+function promptAssistente(){
+  const acoes=Object.keys(ACOES).join(', ');
+  return `Você é o assistente do FluxoCaixa, um app de controle financeiro usado por um empresário brasileiro dono de uma confecção de roupa feminina e de lojas próprias. Ele não é da área de tecnologia nem de contabilidade.
+
+COMO FALAR
+- Português do Brasil, direto e simples, sem jargão. Trate por "você".
+- Respostas curtas. Não repita o que ele disse nem faça lista quando uma frase resolve.
+- Nas perguntas sobre números, responda com o valor e o essencial. Os dados estão abaixo; não mande ele conferir na tela.
+- Se faltar informação para agir, pergunte só o que falta, uma coisa de cada vez.
+
+O QUE VOCÊ PODE MUDAR
+Você não altera nada sozinho: propõe e ele confirma com um toque. Para propor, devolva ações no campo "acoes".
+Ações disponíveis: ${acoes}.
+
+Formato de cada ação (use exatamente estes nomes de campo):
+{"acao":"criar_unidade","nome":"Loja Centro"}
+{"acao":"renomear_unidade","id":"u2","nome":"Loja Shopping"}
+{"acao":"remover_unidade","id":"u3"}
+{"acao":"criar_maquina","nome":"Stone Loja 1","unidade":"u2","taxa_debito":1.2,"taxa_credito_1x":2.9,"taxa_credito_2_6x":3.6,"taxa_credito_7x":4.3,"prazo_debito":1,"prazo_credito":30}
+{"acao":"editar_maquina","id":"m1","taxa_debito":1.2}
+{"acao":"remover_maquina","id":"m4"}
+{"acao":"criar_socio","nome":"Zé"}
+{"acao":"renomear_socio","id":"s1","nome":"Theo"}
+{"acao":"remover_socio","id":"s3"}
+{"acao":"criar_conta_fixa","descricao":"Aluguel Loja 1","valor":7000,"categoria":"aluguel","unidade":"u2","dia_vencimento":5}
+{"acao":"editar_conta_fixa","id":"f1","valor":7200}
+{"acao":"remover_conta_fixa","id":"f2"}
+{"acao":"criar_lancamento","tipo":"out","valor":540,"categoria":"tecido","unidade":"u1","descricao":"Tecido malha","fornecedor":"Tecidos SP","data":"2026-07-28","vencimento":null}
+{"acao":"definir_periodo","periodo":"mesx","mes":"2026-06"}
+{"acao":"definir_unidade_exibida","unidade":"u2"}
+
+Em definir_periodo, "periodo" aceita: hoje, ontem, semana, mes, mes_passado, trimestre, ano, tudo; ou "dia" com o campo dia; ou "mesx" com o campo mes; ou "custom" com de e ate.
+
+REGRAS
+- Use sempre os ids que aparecem nos dados. Nunca invente id.
+- Categoria precisa ser um id da lista de categorias. Retirada de sócio usa a categoria "pessoal_" seguida do id do sócio.
+- Taxa é porcentagem (1.2 quer dizer 1,2%). Prazo é em dias.
+- Se ele pedir algo fora dessas ações, explique em uma frase o que ele mesmo faz na tela.
+- Nunca proponha remover nada sem ele ter pedido claramente.
+
+ATENÇÃO ÀS MAQUININHAS
+As maquininhas cadastradas vieram com taxas de exemplo, inventadas na montagem do app, que provavelmente não são as reais dele. Elas afetam o valor líquido das vendas, a data em que o dinheiro cai e todas as margens do relatório. Se notar que ele nunca as revisou, ofereça corrigir.
+
+ESTADO ATUAL DO SISTEMA (JSON)
+${JSON.stringify(estadoParaIA())}
+
+RESPONDA SEMPRE E SOMENTE COM ESTE JSON, sem nenhum texto fora dele:
+{"resposta":"o que você diz para ele","acoes":[]}
+Deixe "acoes" vazio quando for só conversa ou resposta a uma pergunta.`;
+}
+
+async function enviarChat(texto){
+  const apiKey=localStorage.getItem(SK_KEY);
+  if(!apiKey) throw new Error('Configure a chave de API em Config');
+  const msgs=[{role:'system',content:promptAssistente()}];
+  chatHist.slice(-14).forEach(m=>msgs.push({role:m.role,content:m.content}));
+  msgs.push({role:'user',content:texto});
+  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,
+      'HTTP-Referer':location.origin,'X-Title':'FluxoCaixa'},
+    body:JSON.stringify({model:OR_MODEL,max_tokens:1600,messages:msgs})
+  });
+  const txt=await respostaIA(r);
+  const m=txt.match(/\{[\s\S]*\}/);
+  if(!m) return {resposta:txt,acoes:[]};
+  try{
+    const j=JSON.parse(m[0]);
+    return {resposta:(j.resposta||'').toString(), acoes:Array.isArray(j.acoes)?j.acoes:[]};
+  }catch(e){
+    return {resposta:txt,acoes:[]};
+  }
+}
+
+// ── TELA DA CONVERSA ──
+let chatPendentes=null;   // ações propostas aguardando confirmação
+let chatOcupado=false;
+
+function openChat(inicial){
+  renderChat();
+  openMo('mo-chat');
+  setTimeout(()=>{
+    const c=document.getElementById('chat-msgs');
+    if(c) c.scrollTop=c.scrollHeight;
+    if(!inicial) document.getElementById('chat-input')?.focus();
+  },250);
+  if(inicial) mandarChat(inicial,true);
+}
+
+function renderChat(){
+  const el=document.getElementById('chat-msgs');
+  if(!el) return;
+  if(!chatHist.length && !chatOcupado){
+    el.innerHTML=`<div class="chat-vazio">
+      <div class="chat-vazio-t">Pode perguntar ou pedir para mudar algo</div>
+      <div class="chat-sug">
+        ${['Quanto gastei com tecido este mês?','Qual foi meu lucro em junho?','Corrigir as taxas das maquininhas','Cadastrar uma conta fixa']
+          .map(s=>`<button class="chat-sug-b" onclick="usarSugestao(${JSON.stringify(s).replace(/"/g,'&quot;')})">${s}</button>`).join('')}
+      </div>
+    </div>`;
+    return;
+  }
+  el.innerHTML=chatHist.map((m,i)=>{
+    if(m.role==='user') return `<div class="chat-b chat-eu">${esc(m.content)}</div>`;
+    const acoes=m.acoes&&m.acoes.length
+      ? `<div class="chat-acoes" id="chat-ac-${i}">
+           <div class="chat-acoes-t">Vou fazer isto:</div>
+           ${m.acoes.map(a=>`<div class="chat-ac-item">${esc(descreverAcao(a))}</div>`).join('')}
+           ${m.aplicado
+             ? `<div class="chat-ac-ok">Aplicado</div>`
+             : `<div style="display:flex;gap:8px;margin-top:10px">
+                  <button class="chat-ac-btn ok" onclick="confirmarAcoes(${i})">Aplicar</button>
+                  <button class="chat-ac-btn" onclick="descartarAcoes(${i})">Agora não</button>
+                </div>`}
+         </div>`
+      : '';
+    const res=m.resultado
+      ? `<div class="chat-res">${m.resultado.map(r=>esc(r)).join('<br/>')}</div>` : '';
+    return `<div class="chat-b chat-ia">${esc(m.content)}</div>${acoes}${res}`;
+  }).join('') + (chatOcupado?`<div class="chat-b chat-ia chat-pensando"><span></span><span></span><span></span></div>`:'');
+  el.scrollTop=el.scrollHeight;
+}
+
+function usarSugestao(t){ document.getElementById('chat-input').value=t; mandarChat(); }
+
+async function mandarChat(forcado, ehInicial){
+  if(chatOcupado) return;
+  const inp=document.getElementById('chat-input');
+  const texto=(forcado||(inp?inp.value:'')||'').trim();
+  if(!texto) return;
+  if(!localStorage.getItem(SK_KEY)){
+    showToast('warn','Configure a chave de IA em Config');
+    closeMo('mo-chat'); setTab('config'); return;
+  }
+  if(inp) inp.value='';
+  if(!ehInicial) chatHist.push({role:'user',content:texto});
+  chatOcupado=true; renderChat();
+  try{
+    const r=await enviarChat(texto);
+    chatHist.push({role:'assistant',content:r.resposta||'(sem resposta)',acoes:r.acoes||[]});
+  }catch(e){
+    chatHist.push({role:'assistant',content:'Não consegui responder agora. '+e.message,acoes:[]});
+  }
+  chatOcupado=false;
+  save(); renderChat();
+}
+
+function confirmarAcoes(i){
+  const m=chatHist[i];
+  if(!m||!m.acoes||m.aplicado) return;
+  const {feitos,erros}=aplicarAcoes(m.acoes);
+  m.aplicado=true;
+  m.resultado=[...feitos, ...erros.map(e=>'Não deu: '+e)];
+  save();
+  renderChat();
+  renderPeriodBar(); renderPage(currentTab);
+  if(feitos.length&&!erros.length) showToast('ok',feitos.length===1?feitos[0]:`${feitos.length} mudanças aplicadas`);
+  else if(erros.length&&!feitos.length) showToast('warn','Não consegui aplicar');
+  else showToast('warn',`${feitos.length} aplicadas, ${erros.length} com problema`);
+}
+
+function descartarAcoes(i){
+  const m=chatHist[i];
+  if(!m) return;
+  m.acoes=[]; m.resultado=['Descartado.'];
+  save(); renderChat();
+}
+
+function limparChat(){
+  if(chatHist.length && !confirm('Apagar esta conversa?')) return;
+  chatHist=[]; save(); renderChat();
+}
+
+// ── ONBOARDING ──
+function precisaConfigurar(){ return !jaConfigurou; }
+function marcarConfigurado(){ jaConfigurou=true; localStorage.setItem(SK_ONB,'1'); renderPage(currentTab); }
+function comecarOnboarding(){
+  if(!localStorage.getItem(SK_KEY)){
+    showToast('warn','Primeiro cole a chave de IA em Config');
+    setTab('config'); return;
+  }
+  marcarConfigurado();
+  chatHist=[];
+  openChat('Oi! Quero configurar o app do meu jeito. Me ajuda a acertar as unidades, as maquininhas com as taxas reais, os sócios e as contas fixas? Pode começar perguntando o que precisar.');
+}
+
+// ══════════════════════════════════════════════════
 // CONCILIAÇÃO DO EXTRATO
 // ══════════════════════════════════════════════════
+
 let ultimaConciliacao=null;
 
 function openExtrato(){
