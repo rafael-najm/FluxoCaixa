@@ -42,7 +42,7 @@
 html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color:var(--text);
   font-family:var(--ui);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
 /* Números alinham em coluna: algarismos de largura fixa em todo valor. */
-.num,.hero-val,.hg-val,.sc-val,.row-val,.cat-val,.rel-val,.pb-val,.ex-num{
+.num,.hero-val,.hg-val,.row-val,.cat-val,.rel-val,.pb-val,.ex-num{
   font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;}
 #app{height:100dvh;width:100%;display:flex;flex-direction:column;overflow:hidden;}
 .sb{height:var(--safe-t);background:var(--bg);flex-shrink:0;}
@@ -98,7 +98,9 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   border-radius:10px;background:var(--accent);color:#fff;border:none;display:flex;align-items:center;
   justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(21,24,29,.16);z-index:99;
   transition:transform .12s;}
+.fab-main{transition:transform .22s ease,opacity .22s ease;}
 .fab-main:active{transform:scale(.94);}
+.fab-main.fab-oculto{transform:translateY(150%);opacity:0;pointer-events:none;}
 .fab-main.hidden{display:none;}
 .fab-badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;border-radius:10px;
   background:var(--text);color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;
@@ -147,6 +149,11 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 .cat-row:last-child{border-bottom:none;}
 .cat-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
 .sw{width:12px;height:12px;border-radius:3px;display:block;flex-shrink:0;}
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+  border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.cat-mini{display:flex;align-items:center;gap:8px;background:var(--s1);padding:11px 12px;
+  font-size:12.5px;color:var(--text);min-width:0;}
+.cat-mini span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cat-info{flex:1;min-width:0;}
 .cat-name{font-size:13px;font-weight:500;color:var(--text);}
 .cat-bar-wrap{height:3px;background:var(--s3);border-radius:2px;margin-top:7px;overflow:hidden;}
@@ -348,7 +355,6 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 .ex-num{font-weight:600;font-size:15px;color:var(--text);}
 .note{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 13px;
   font-size:12px;color:var(--text2);line-height:1.6;}
-.note-ok{background:var(--green-d);border-color:#D3E5DC;color:var(--green);}
 </style>
 </head>
 <body>
@@ -548,7 +554,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
     <div class="chat-msgs" id="chat-msgs"></div>
     <div class="chat-bar">
       <textarea id="chat-input" rows="1" placeholder="Escreva sua pergunta ou peça uma mudança"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mandarChat();}"></textarea>
+        oninput="cresceCampo(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mandarChat();}"></textarea>
       <button class="chat-send" onclick="mandarChat()" aria-label="Enviar"><svg class="ic"><use href="#i-arrow-up"/></svg></button>
     </div>
   </div>
@@ -678,8 +684,8 @@ const CAT_OUT = [
   {id:'funcionarios', label:'Funcionários',     cor:'#8A6A3A'},
   {id:'aluguel',      label:'Aluguel',          cor:'#8A5A3C'},
   {id:'energia',      label:'Energia/Água/Tel', cor:'#8A7433'},
-  {id:'marketing',    label:'Marketing/Publicidade',cor:'#4A6E6A'},
-  {id:'embalagens',   label:'Embalagens/Sacolas',cor:'#5E7A6E'},
+  {id:'marketing',    label:'Marketing/Publicidade',cor:'#85566A'},
+  {id:'embalagens',   label:'Embalagens/Sacolas',cor:'#7A6A45'},
   {id:'manutencao',   label:'Manutenção',       cor:'#5F6975'},
   {id:'sistema',      label:'Sistema/Software',  cor:'#3E6480'},
   {id:'impostos',     label:'Impostos/Taxas',   cor:'#8A4A45'},
@@ -689,7 +695,7 @@ const CAT_OUT = [
 ];
 // Categoria legada: lançamentos antigos que usavam uma única categoria pessoal.
 const LEGACY_CATS = [{id:'pessoal',label:'Pessoal (sem sócio)',cor:'#7A5570'}];
-const SOCIO_CORES = ['#7A5570','#4F5585','#3F6B6B','#7A6045','#5F7050'];
+const SOCIO_CORES = ['#7A5570','#4F5585','#7A5A45','#5F5F7A','#6B5A50'];
 
 // Categoria de retirada pessoal é gerada por sócio, para separar o gasto de cada um.
 function catSocioId(sid){ return 'pessoal_'+sid; }
@@ -868,7 +874,6 @@ const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 const today = () => new Date().toISOString().split('T')[0];
 const fmtDate = d => { if(!d)return''; const[y,m,dd]=d.split('-'); return`${dd}/${m}`; };
 const fmtDateFull = d => { if(!d)return''; const[y,m,dd]=d.split('-'); return`${dd}/${m}/${y}`; };
-const fmtMonth = d => { if(!d)return''; const[y,m]=d.split('-'); const ms=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return`${ms[+m-1]}/${y.slice(2)}`; };
 
 function getCat(id){ return allCats().find(c=>c.id===id)||{label:id,cor:'#6B7280'}; }
 function getMaq(id){ return maquinas.find(m=>m.id===id); }
@@ -1096,7 +1101,10 @@ function setTab(tab){
   document.getElementById('period-bar').style.display=tab==='revisao'?'none':'flex';
   // O + some nas telas de leitura para não cobrir os números do relatório.
   const semFab=['revisao','relatorio','config'].includes(tab);
-  document.getElementById('fab-main').classList.toggle('hidden',semFab);
+  const fab=document.getElementById('fab-main');
+  fab.classList.toggle('hidden',semFab);
+  fab.classList.remove('fab-oculto');
+  _scrollAnt=0;
   renderPage(tab);
 }
 function renderPage(tab){
@@ -1106,6 +1114,23 @@ function renderPage(tab){
   if(tab==='config')     renderConfig();
   if(tab==='revisao')    renderRevisao();
   atualizarBadge();
+}
+
+// Enquanto ele desce a lista o + sai da frente e volta quando ele para ou sobe.
+let _scrollAnt=0, _fabT=null;
+function ligarFabScroll(){
+  document.querySelectorAll('.content').forEach(c=>{
+    c.addEventListener('scroll',()=>{
+      const f=document.getElementById('fab-main');
+      if(!f||f.classList.contains('hidden')) return;
+      const y=c.scrollTop;
+      if(y>_scrollAnt+8 && y>90) f.classList.add('fab-oculto');
+      else if(y<_scrollAnt-8) f.classList.remove('fab-oculto');
+      _scrollAnt=y;
+      clearTimeout(_fabT);
+      _fabT=setTimeout(()=>f.classList.remove('fab-oculto'),700);
+    },{passive:true});
+  });
 }
 
 // Mostra no + quantos comprovantes estão esperando conferência.
@@ -1217,7 +1242,7 @@ function renderHome(){
   }
 
   if(!data.length){
-    html+=`<div class="empty"><div class="empty-ico"><svg class="ic"><use href="#i-chart"/></svg></div><div class="empty-t">Nenhum lançamento</div><div class="empty-s">Toque em Revisar e envie os comprovantes do dia.</div></div>`;
+    html+=vazioHTML('chart','Tudo começa aqui','Envie os comprovantes do dia e eu organizo o resto.');
   }
 
   document.getElementById('home-content').innerHTML=html;
@@ -1229,6 +1254,37 @@ function renderHome(){
 // ══════════════════════════════════════════════════
 // LANCAMENTOS
 // ══════════════════════════════════════════════════
+// A linha tem pouca largura: mostra data e categoria sempre, e a unidade só
+// quando ele está vendo todas — senão repete a mesma palavra em toda linha.
+// Sem isso ele escolhe um mês vazio e pensa que o app perdeu os lançamentos.
+function vazioHTML(icone, tituloPrimeiroUso, textoPrimeiroUso){
+  // O rótulo do período varia ("Hoje", "junho de 2026"), então entra numa
+  // frase própria em vez de encaixado no título.
+  if(lancamentos.length){
+    return `<div class="empty">
+      <div class="empty-ico"><svg class="ic"><use href="#i-${icone}"/></svg></div>
+      <div class="empty-t">Nada neste período</div>
+      <div class="empty-s">${esc(labelPeriodo())} não tem lançamentos.<br/>${lancamentos.length===1?'O seu único lançamento está':'Os seus '+lancamentos.length+' lançamentos estão'} em outro período.</div>
+      <button class="btn-p btn-ghost" style="max-width:230px;margin:18px auto 0" onclick="openPeriodo()">Trocar período</button>
+    </div>`;
+  }
+  return `<div class="empty">
+    <div class="empty-ico"><svg class="ic"><use href="#i-${icone}"/></svg></div>
+    <div class="empty-t">${tituloPrimeiroUso}</div>
+    <div class="empty-s">${textoPrimeiroUso}</div>
+    <button class="btn-p btn-green" style="max-width:230px;margin:18px auto 0" onclick="pickFiles()">Enviar comprovantes</button>
+  </div>`;
+}
+
+function metaLinha(l,cat,unit){
+  const [ini,fim]=getPeriodRange();
+  const mesmoAno=ini.slice(0,4)===fim.slice(0,4);
+  const data=mesmoAno?fmtDate(l.data):`${fmtDate(l.data)}/${l.data.slice(2,4)}`;
+  const partes=[data,cat.label];
+  if(filter.unit==='all') partes.push(unit.name);
+  return partes.map(esc).join(' · ');
+}
+
 function rowHTML(l){
   const isIn=l.tipo==='in';
   const cat=getCat(l.cat); const maq=getMaq(l.maq_id);
@@ -1246,7 +1302,7 @@ function rowHTML(l){
     <div class="row-ico"><span class="sw" style="background:${cat.cor}"></span></div>
     <div class="row-info">
       <div class="row-name">${esc(l.desc||cat.label)}</div>
-      <div class="row-meta">${esc(unit.name)} · ${cat.label} · ${fmtDateFull(l.data)}</div>
+      <div class="row-meta">${metaLinha(l,cat,unit)}</div>
       ${vencTag}${compTag}
     </div>
     <div class="row-right">
@@ -1277,7 +1333,7 @@ function renderLancamentos(){
   if(window._lancFilter==='out') rows=data.filter(l=>l.tipo==='out');
 
   if(!rows.length){
-    html+=`<div class="empty"><div class="empty-ico"><svg class="ic"><use href="#i-list"/></svg></div><div class="empty-t">Sem lançamentos</div><div class="empty-s">Altere o período ou adicione lançamentos.</div></div>`;
+    html+=vazioHTML('list','Nenhum lançamento ainda','Envie os comprovantes do dia e eles aparecem aqui.');
   } else {
     html+=`<div class="lst">${rows.map(l=>rowHTML(l)).join('')}</div>`;
   }
@@ -1397,7 +1453,7 @@ function renderRelatorio(){
   }
 
   if(!data.length){
-    html+=`<div class="empty"><div class="empty-ico"><svg class="ic"><use href="#i-chart"/></svg></div><div class="empty-t">Sem dados</div><div class="empty-s">Adicione lançamentos para ver o relatório.</div></div>`;
+    html+=vazioHTML('chart','Sem dados para o relatório','Depois dos primeiros lançamentos o relatório se monta sozinho.');
   }
 
   document.getElementById('rel-content').innerHTML=html;
@@ -1719,11 +1775,8 @@ function renderConfig(){
     </div>`).join('')}</div>
 
   <div class="sh"><div class="st">Categorias de saída</div></div>
-  <div class="lst">${catsOut().map(c=>`
-    <div class="cat-row">
-      <div class="cat-dot" style="background:${c.cor}"></div>
-      <div class="cat-info"><div class="cat-name">${c.label}</div></div>
-    </div>`).join('')}</div>
+  <div class="cat-grid">${catsOut().map(c=>`
+    <div class="cat-mini"><span class="sw" style="background:${c.cor}"></span><span>${esc(c.label)}</span></div>`).join('')}</div>
 
   <div style="margin-top:24px;padding:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px">
     <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted)">DADOS</div>
@@ -3019,6 +3072,8 @@ function renderChat(){
   el.scrollTop=el.scrollHeight;
 }
 
+function cresceCampo(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }
+
 function usarSugestao(t){ document.getElementById('chat-input').value=t; mandarChat(); }
 
 async function mandarChat(forcado, ehInicial){
@@ -3030,7 +3085,7 @@ async function mandarChat(forcado, ehInicial){
     showToast('warn','Configure a chave de IA em Config');
     closeMo('mo-chat'); setTab('config'); return;
   }
-  if(inp) inp.value='';
+  if(inp){ inp.value=''; cresceCampo(inp); }
   if(!ehInicial) chatHist.push({role:'user',content:texto});
   chatOcupado=true; renderChat();
   try{
@@ -3593,6 +3648,7 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 // ══════════════════════════════════════════════════
 renderPeriodBar();
 atualizarBadge();
+ligarFabScroll();
 // Se ficou remessa pela metade (fechou o app no meio), volta direto nela.
 if(revisao.length) setTab('revisao');
 else renderHome();
