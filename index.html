@@ -524,7 +524,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
     <div class="mh"></div>
     <div class="mt" id="mo-maq-title">Nova Máquina</div>
     <div class="mb">
-      <div class="field"><label>Nome</label><input type="text" id="mq-nome" placeholder="Ex: Stone Loja Centro"/></div>
+      <div class="field"><label>Nome</label><input type="text" id="mq-nome" placeholder="Ex: Stone Flores"/></div>
       <div class="field"><label>Cor</label><input type="color" id="mq-cor" value="#2F6F5E" style="height:48px;padding:4px"/></div>
       <div class="field"><label>Unidade</label><select id="mq-unit"></select></div>
       <div class="two-col">
@@ -639,7 +639,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
     <div class="mh"></div>
     <div class="mt" id="mo-fixa-title">Nova Conta Fixa</div>
     <div class="mb">
-      <div class="field"><label>Descrição</label><input type="text" id="fx-desc" placeholder="Ex: Aluguel Loja 1"/></div>
+      <div class="field"><label>Descrição</label><input type="text" id="fx-desc" placeholder="Ex: Aluguel Flores"/></div>
       <div class="field"><label>Categoria</label><select id="fx-cat"></select></div>
       <div class="two-col">
         <div class="field"><label>Valor mensal (R$)</label><input type="number" id="fx-valor" inputmode="decimal" placeholder="0,00"/></div>
@@ -649,6 +649,27 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
       <button class="btn-p btn-green" onclick="saveFixa()">Salvar conta fixa</button>
       <button class="btn-p btn-ghost" onclick="closeMo('mo-fixa')">Cancelar</button>
       <button class="btn-p btn-del" id="fx-del-btn" onclick="deleteFixa()" style="display:none">Excluir conta fixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAR CONTAS FIXAS -->
+<div class="mo" id="mo-impfixas">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">Importar contas fixas</div>
+    <div class="mb">
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px">
+        Cole a lista das despesas que se repetem todo mês. Eu leio linha por linha, adivinho a
+        categoria e a loja, e mostro tudo antes de cadastrar.
+      </div>
+      <div class="field" style="margin-top:0">
+        <label>Cole a lista aqui</label>
+        <textarea id="imf-texto" placeholder="Uma conta por linha. Ex:&#10;05 | 4.260,00 | Aluguel Tame | Aluguel | Tame&#10;Folha de pagamento Tijuca 7.500,00 dia 5" style="min-height:130px"></textarea>
+      </div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="lerImportFixas()">Ver o que entendi</button>
+      <div id="imf-resultado"></div>
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-impfixas')">Fechar</button>
     </div>
   </div>
 </div>
@@ -725,18 +746,22 @@ const DEFAULT_SOCIOS = [
   {id:'s3',name:'Zé'},
 ];
 
+// As lojas que existem hoje. Dá para renomear, apagar ou criar outras em Ajustes.
 const DEFAULT_UNITS = [
   {id:'u1',name:'Confecção'},
-  {id:'u2',name:'Loja 1'},
-  {id:'u3',name:'Loja 2'},
-  {id:'u4',name:'Loja 3'},
-  {id:'u5',name:'Loja 4'},
+  {id:'u2',name:'Flores'},
+  {id:'u3',name:'Tame'},
+  {id:'u4',name:'Tijuca'},
+  {id:'u5',name:'Cinelândia'},
+  {id:'u6',name:'Largo do Machado'},
 ];
+// Taxas e prazos aqui são só um ponto de partida: cada maquininha precisa ser
+// conferida no contrato, senão o líquido das vendas sai errado.
 const DEFAULT_MAQUINAS = [
-  {id:'m1',name:'Stone Loja 1',unit:'u2',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#2F6F5E'},
-  {id:'m2',name:'Cielo Loja 1',unit:'u2',taxa_debito:1.8,taxa_credito_1x:3.1,taxa_credito_2_6x:3.8,taxa_credito_7x:4.5,prazo_debito:1,prazo_credito:28,cor:'#3F5F82'},
-  {id:'m3',name:'Stone Loja 2',unit:'u3',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#5B5486'},
-  {id:'m4',name:'PagSeguro Loja 2',unit:'u3',taxa_debito:2.0,taxa_credito_1x:3.3,taxa_credito_2_6x:4.0,taxa_credito_7x:4.8,prazo_debito:2,prazo_credito:30,cor:'#8A5A3C'},
+  {id:'m1',name:'Stone Flores',unit:'u2',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#2F6F5E'},
+  {id:'m2',name:'Cielo Flores',unit:'u2',taxa_debito:1.8,taxa_credito_1x:3.1,taxa_credito_2_6x:3.8,taxa_credito_7x:4.5,prazo_debito:1,prazo_credito:28,cor:'#3F5F82'},
+  {id:'m3',name:'Stone Tame',unit:'u3',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#5B5486'},
+  {id:'m4',name:'PagSeguro Tame',unit:'u3',taxa_debito:2.0,taxa_credito_1x:3.3,taxa_credito_2_6x:4.0,taxa_credito_7x:4.8,prazo_debito:2,prazo_credito:30,cor:'#8A5A3C'},
 ];
 
 let units    = JSON.parse(localStorage.getItem(SK_U)||'null') || DEFAULT_UNITS;
@@ -1750,8 +1775,9 @@ function renderConfig(){
       <div class="chev"><svg class="ic ic-sm"><use href="#i-chevron"/></svg></div>
     </div>`).join('')}</div>
 
-  <div class="sh"><div class="st">Contas fixas mensais</div><div class="sa" onclick="openAddFixa()">+ Nova</div></div>
-  <div style="font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.5">Despesas que se repetem todo mês (aluguel, luz, funcionários, sistema). Servem para prever o mês no relatório.</div>
+  <div class="sh"><div class="st">Contas fixas mensais</div>
+    <div style="display:flex;gap:14px"><div class="sa" onclick="openImportFixas()">Importar lista</div><div class="sa" onclick="openAddFixa()">+ Nova</div></div></div>
+  <div style="font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.5">Despesas que se repetem todo mês (aluguel, luz, funcionários, sistema). Servem para prever o mês no relatório. Se você já tem a lista escrita, use <b>Importar lista</b> e cole tudo de uma vez.</div>
   ${fixas.length?`<div class="lst">${fixas.map(f=>`
     <div class="row" onclick="openEditFixa('${f.id}')">
       <div class="row-ico"><span class="sw" style="background:${getCat(f.cat).cor}"></span></div>
@@ -1761,7 +1787,7 @@ function renderConfig(){
       </div>
       <div class="row-right"><div class="row-val">${fmt(f.valor)}</div><div class="row-sub" style="color:var(--muted)">por mês</div></div>
     </div>`).join('')}</div>`
-  :`<div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center;font-size:12px;color:var(--muted)">Nenhuma conta fixa cadastrada ainda.</div>`}
+  :`<div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center;font-size:12px;color:var(--muted)">Nenhuma conta fixa cadastrada ainda.<br>Cole a sua lista em <span style="color:var(--accent);cursor:pointer" onclick="openImportFixas()">Importar lista</span>.</div>`}
 
   <div class="sh"><div class="st">Maquininhas</div><div class="sa" onclick="openAddMaq()">+ Nova</div></div>
   <div class="lst">${maquinas.map(m=>`
@@ -1863,7 +1889,7 @@ function saveApiKey(){
 
 // ── UNIT MANAGEMENT (simple inline prompt for now) ──
 function openAddUnit(){
-  const name=prompt('Nome da unidade (ex: Confecção, Loja Centro):');
+  const name=prompt('Nome da unidade (ex: Confecção, Tijuca):');
   if(!name) return;
   units.push({id:'u'+Date.now(),name:name.trim()});
   save(); renderConfig();
@@ -2173,6 +2199,246 @@ function deleteFixa(){
   lancamentos.forEach(l=>{ if(l.fixa_id===editingFixaId) l.fixa_id=null; });
   save(); closeMo('mo-fixa'); renderPage(currentTab);
   showToast('del','Conta fixa removida');
+}
+
+// ══════════════════════════════════════════════════
+// IMPORTAR CONTAS FIXAS COLADAS
+// ══════════════════════════════════════════════════
+// A lista das contas do mês vive numa planilha do escritório. Em vez de digitar
+// uma por uma no celular, ele cola o texto e a gente lê o que dá.
+
+// Palavra na descrição → categoria. A ordem importa: "Aluguel / Luz" é aluguel,
+// não energia; e o que fala de folha é funcionários mesmo tendo imposto no nome.
+const REGRAS_CAT_FIXA = [
+  [/alugu|iptu|condomin|loca[çc]/, 'aluguel'],
+  [/folha de pagament|folha pagament|sal[áa]ri|13[ºo]|d[ée]cimo|f[ée]rias|vale transp|v\.? ?transp|vale refei|lanche|funcion[áa]ri|estagi[áa]ri|rescis/, 'funcionarios'],
+  [/light|aguas do rio|[áa]gua|enel|energia|\bluz\b|\bvivo\b|\bclaro\b|\btim\b|\boi\b|telefon|celular|internet|recarga|fibra/, 'energia'],
+  [/simples nacional|\bsimples\b|\binss\b|\bfgts\b|\bdarf\b|\birrf\b|\biss\b|\bicms\b|\bdas\b|imposto|tribut|guia de recol/, 'impostos'],
+  [/sistema|software|\berp\b|servidor|hospedag|dom[íi]nio|\bsite\b|plataforma|gateway|edrone|vindi|yapay/, 'sistema'],
+  [/marketing|publicidad|tr[áa]fego|an[úu]ncio|instagram|google ads|ag[êe]ncia|vitrinist|social media|fot[óo]graf/, 'marketing'],
+  [/correio|motoboy|lalamove|\bfrete\b|transportador|entrega/, 'frete'],
+  [/manuten|conserto|reparo|dedetiz|limpeza|jardin/, 'manutencao'],
+  [/tecido|malha|tricot/, 'tecido'],
+  [/aviament|bot[ãa]o|z[íi]per|linha de costura|etiqueta/, 'aviamentos'],
+  [/costurei|fac[çc][ãa]o|oficina de costura/, 'confeccao'],
+  [/embalag|sacola|caixa de papel/, 'embalagens'],
+  [/tarifa|cesta de servi|bancári|bancari|maquinet/, 'tarifas'],
+  [/ped[áa]gio|combust[íi]vel|gasolina|estacionament|\buber\b|t[áa]xi|passagem/, 'transporte'],
+  [/cont[áa]bil|contador|advogad|consultori|honor[áa]ri|seguro|associa[çc]/, 'outros_out'],
+];
+
+// O texto colado pode trazer a categoria escrita do jeito da planilha
+// ("Energia/Água/Tel", "Outros Gastos"). Tento casar com as categorias do app
+// e, se não der, leio as palavras.
+function catFixaPorTexto(txt){
+  const t = norm(txt);
+  if(!t) return null;
+  const exata = catsOut().find(c=>norm(c.label)===t);
+  if(exata) return exata.id;
+  for(const [re,cat] of REGRAS_CAT_FIXA) if(re.test(t)) return cat;
+  return null;
+}
+
+// Unidade pelo nome escrito. Devolve {id} quando já existe e {nome} quando é
+// para criar. "(empresa toda)" vira uma unidade só dela, senão a despesa da
+// empresa inteira ficaria pendurada numa loja qualquer.
+function unitPorTexto(txt){
+  const t = norm(txt).replace(/[()]/g,'').trim();
+  if(!t) return null;
+  if(/^(empresa toda|empresa|geral|todas|todos|matriz|escrit[óo]rio|adm|administrativo)$/.test(t))
+    return unitExistente('Empresa (geral)') || {nome:'Empresa (geral)'};
+  return unitExistente(t) || {nome:txt.replace(/[()]/g,'').trim()};
+}
+// "Loja Tijuca", "TIJUCA 1" e "Largo" são a mesma loja que "Tijuca" e "Largo do
+// Machado". Já "Barra da Tijuca" não é — por isso só vale começo de nome, não
+// pedaço solto no meio.
+const semGenerico = t => norm(t).replace(/\b(loja|unidade|filial|un|n[ºo°]?\s*\d+)\b/g,'')
+  .replace(/[^a-z0-9\s]/g,' ').replace(/\s{2,}/g,' ').trim();
+function unitExistente(t){
+  const n = semGenerico(t);
+  if(!n) return null;
+  const comeca = (a,b) => a===b || (a.startsWith(b) && /[\s\d]/.test(a[b.length]));
+  const u = units.find(x=>semGenerico(x.name)===n)
+         || units.find(x=>{ const m=semGenerico(x.name);
+             return m.length>=4 && (comeca(n,m)||comeca(m,n)); });
+  return u?{id:u.id}:null;
+}
+// Sem coluna de unidade, procuro o nome de alguma loja dentro da descrição.
+function unitNaDescricao(desc){
+  const d = norm(desc);
+  const u = units.find(x=>{ const m=norm(x.name); return m.length>=4 && d.includes(m); });
+  return u?{id:u.id}:null;
+}
+
+const LINHA_IGNORADA = [
+  /^[-=_·•|\s]+$/,                  // linha de traços
+  /(^|\s)totais?(\s|:|$)/i,         // rodapé de soma
+  /^\d+\s+lan[çc]amentos/i,
+];
+
+function parseFixasTexto(txt){
+  const itens=[];
+  (txt||'').split(/\r?\n/).forEach(bruta=>{
+    const linha=bruta.trim();
+    if(!linha) return;
+    if(LINHA_IGNORADA.some(re=>re.test(linha))) return;
+    const it=lerLinhaFixa(linha);
+    if(it) itens.push(it);
+  });
+  return itens;
+}
+
+const ehDia = c => /^(0?[1-9]|[12]\d|3[01])$/.test(c);
+const ehValorSolto = c => /^(?:r\$)?\s*-?[\d.,]+$/i.test(c) && !isNaN(parseValorBR(c));
+
+// Uma linha vira uma conta fixa, ou nada. Linha de cabeçalho e título não têm
+// valor, então caem fora sozinhas.
+function lerLinhaFixa(linha){
+  let celulas = linha.split(/\s*[|;]\s*|\t+/).map(c=>c.trim()).filter(Boolean);
+  return celulas.length>=3 ? lerLinhaEmColunas(celulas) : lerLinhaSolta(linha);
+}
+
+function lerLinhaEmColunas(celulas){
+  const resto=[...celulas];
+  const tira = teste => { const i=resto.findIndex(teste); return i<0?null:resto.splice(i,1)[0]; };
+  const dia   = tira(ehDia);
+  const valor = tira(ehValorSolto);
+  if(valor===null) return null;
+  // Tirados o dia e o valor, o que sobra é descrição, categoria e unidade,
+  // nessa ordem — como sai da planilha.
+  const comLetra = resto.filter(c=>/[a-zà-ú]{2}/i.test(c));
+  if(!comLetra.length) return null;
+  const desc = comLetra[0];
+  const dicas = comLetra.slice(1);
+  let dicaCat=null, dicaUnit=null;
+  if(dicas.length>=2){ dicaCat=dicas[0]; dicaUnit=dicas[dicas.length-1]; }
+  else if(dicas.length===1){ if(catFixaPorTexto(dicas[0])) dicaCat=dicas[0]; else dicaUnit=dicas[0]; }
+  return montarFixa({desc, valor, dia, dicaCat, dicaUnit});
+}
+
+function lerLinhaSolta(linha){
+  let t=linha;
+  let dia=null;
+  const mDia = t.match(/(?:todo\s+)?(?:dia|vence(?:\s+dia)?|venc\.?)\s*:?\s*(\d{1,2})\b/i);
+  if(mDia && ehDia(mDia[1])){ dia=mDia[1]; t=t.replace(mDia[0],' '); }
+  else {
+    const mIni = t.match(/^(\d{1,2})\s*[-–—)]\s*/);
+    if(mIni && ehDia(mIni[1])){ dia=mIni[1]; t=t.slice(mIni[0].length); }
+  }
+  // O valor é o número com cara de dinheiro que sobrou na linha. O "r$" precisa
+  // vir com o cifrão, senão o "r" de "Contador" entraria no número.
+  const tokens=[...t.matchAll(/(?:r\$\s*)?\d[\d.,]*/gi)].filter(m=>{
+    const v=parseValorBR(m[0]); return !isNaN(v)&&v>0;
+  });
+  if(!tokens.length) return null;
+  const escolhido = tokens.find(m=>/[.,]\d{2}\b/.test(m[0])||/r\$/i.test(m[0])) || tokens[tokens.length-1];
+  const valor = escolhido[0];
+  const desc = (t.slice(0,escolhido.index)+' '+t.slice(escolhido.index+valor.length))
+    .replace(/\s*[-–—:]\s*$/,'').replace(/\s{2,}/g,' ').trim();
+  if(!/[a-zà-ú]{2}/i.test(desc)) return null;
+  return montarFixa({desc, valor, dia, dicaCat:null, dicaUnit:null});
+}
+
+function montarFixa({desc, valor, dia, dicaCat, dicaUnit}){
+  const v = parseValorBR(valor);
+  if(isNaN(v) || v<=0) return null;
+  const limpa = desc.replace(/\s{2,}/g,' ').trim();
+  if(limpa.length<2) return null;
+  const cat = catFixaPorTexto(dicaCat) || catFixaPorTexto(limpa) || 'outros_out';
+  const un  = (dicaUnit?unitPorTexto(dicaUnit):null) || unitNaDescricao(limpa) || {id:units[0]?.id};
+  const d   = dia?parseInt(dia,10):null;
+  return {desc:limpa, valor:v, dia:(d>=1&&d<=31)?d:null, cat,
+          unitId:un.id||null, unitNome:un.nome||null};
+}
+
+let fixasImport=[];
+
+function openImportFixas(){
+  fixasImport=[];
+  document.getElementById('imf-texto').value='';
+  document.getElementById('imf-resultado').innerHTML='';
+  openMo('mo-impfixas');
+}
+
+function lerImportFixas(){
+  const txt=document.getElementById('imf-texto').value;
+  if(!txt.trim()){ showToast('warn','Cole a lista primeiro'); return; }
+  fixasImport=parseFixasTexto(txt).map(it=>{
+    // Já cadastrada é a que tem a mesma descrição; não duplico.
+    const jaTem=fixas.some(f=>norm(f.desc)===norm(it.desc));
+    return Object.assign(it,{dup:jaTem, usar:!jaTem});
+  });
+  renderImportFixas();
+}
+
+function renderImportFixas(){
+  const el=document.getElementById('imf-resultado');
+  if(!fixasImport.length){
+    el.innerHTML=`<div class="note" style="margin-top:14px">Não consegui ler nenhuma conta nesse texto.
+      Tente uma conta por linha, com a descrição e o valor. Ex: <b>Aluguel Tijuca 7.500,00 dia 10</b></div>`;
+    return;
+  }
+  const usar=fixasImport.filter(i=>i.usar);
+  const total=usar.reduce((s,i)=>s+i.valor,0);
+  const dups=fixasImport.filter(i=>i.dup).length;
+  const novasUnid=[...new Set(fixasImport.filter(i=>i.usar&&i.unitNome).map(i=>i.unitNome))];
+  // O resumo e o botão vêm antes da lista: com 80 contas ele não precisa rolar
+  // até o fim para confirmar.
+  el.innerHTML=`
+    <div class="divider"></div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">Li ${fixasImport.length} ${fixasImport.length===1?'conta':'contas'}</div>
+    <div class="note">
+      ${usar.length?`Vou cadastrar <b>${usar.length}</b> ${usar.length===1?'conta':'contas'}, somando <b>${fmt(total)}</b> por mês.`:'Nenhuma conta marcada.'}
+      ${dups?` ${dups} já ${dups===1?'estava':'estavam'} cadastrada${dups===1?'':'s'} e ${dups===1?'ficou':'ficaram'} de fora.`:''}
+      ${novasUnid.length?` Vou criar ${novasUnid.length===1?'a unidade':'as unidades'} ${novasUnid.map(n=>'<b>'+esc(n)+'</b>').join(', ')}.`:''}
+      <br>Confira a lista abaixo. Toque numa linha para tirar ou colocar de volta — e depois de cadastrar dá para corrigir qualquer uma.
+    </div>
+    ${usar.length?`<button class="btn-p btn-green" onclick="aplicarImportFixas()">Cadastrar ${usar.length} ${usar.length===1?'conta':'contas'}</button>`:''}
+    <div class="lst" style="margin-top:14px">${fixasImport.map((i,idx)=>`
+      <div class="row" onclick="alternarFixaImport(${idx})" style="${i.usar?'':'opacity:.45'}">
+        <div class="row-ico"><span class="sw" style="background:${getCat(i.cat).cor}"></span></div>
+        <div class="row-info">
+          <div class="row-name">${esc(i.desc)}</div>
+          <div class="row-meta">${esc(i.unitNome?i.unitNome+' (nova)':getUnit(i.unitId).name)} · ${getCat(i.cat).label}${i.dia?' · dia '+i.dia:''}${i.dup?' · já cadastrada':''}</div>
+        </div>
+        <div class="row-right"><div class="row-val">${fmt(i.valor)}</div></div>
+      </div>`).join('')}</div>`;
+}
+
+function alternarFixaImport(idx){
+  const i=fixasImport[idx]; if(!i) return;
+  i.usar=!i.usar;
+  // Guardo onde ele estava: numa lista longa, voltar para o topo a cada toque
+  // faria perder o lugar.
+  const cx=document.querySelector('#mo-impfixas .ms');
+  const y=cx?cx.scrollTop:0;
+  renderImportFixas();
+  if(cx) cx.scrollTop=y;
+}
+
+function aplicarImportFixas(){
+  const escolhidas=fixasImport.filter(i=>i.usar);
+  if(!escolhidas.length){ showToast('warn','Nenhuma conta marcada'); return; }
+  const criadas={};
+  let novasUnid=0;
+  escolhidas.forEach((i,n)=>{
+    let uid=i.unitId;
+    if(!uid){
+      const chave=norm(i.unitNome);
+      if(!criadas[chave]){
+        criadas[chave]='u'+Date.now()+units.length;
+        units.push({id:criadas[chave],name:i.unitNome});
+        novasUnid++;
+      }
+      uid=criadas[chave];
+    }
+    fixas.push({id:'f'+Date.now()+n, desc:i.desc, valor:i.valor, dia:i.dia, cat:i.cat, unit:uid});
+  });
+  save();
+  closeMo('mo-impfixas');
+  renderPage(currentTab);
+  showToast('ok',`${escolhidas.length} ${escolhidas.length===1?'conta fixa cadastrada':'contas fixas cadastradas'}`
+    + (novasUnid?` · ${novasUnid} ${novasUnid===1?'unidade criada':'unidades criadas'}`:''));
 }
 
 // ══════════════════════════════════════════════════
@@ -2988,6 +3254,7 @@ REGRAS
 - Taxa é porcentagem (1.2 quer dizer 1,2%). Prazo é em dias.
 - Se ele pedir algo fora dessas ações, explique em uma frase o que ele mesmo faz na tela.
 - Nunca proponha remover nada sem ele ter pedido claramente.
+- Contas fixas: até umas cinco você mesmo cria. Se ele tiver uma lista comprida, é mais rápido mandar ele abrir Config › Contas fixas mensais › "Importar lista" e colar tudo de uma vez.
 
 ATENÇÃO ÀS MAQUININHAS
 As maquininhas cadastradas vieram com taxas de exemplo, inventadas na montagem do app, que provavelmente não são as reais dele. Elas afetam o valor líquido das vendas, a data em que o dinheiro cai e todas as margens do relatório. Se notar que ele nunca as revisou, ofereça corrigir.
