@@ -536,6 +536,11 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
         <input type="text" id="l-forn" placeholder="Ex: Tecidos São Paulo Ltda"/>
       </div>
       <div class="field">
+        <label id="l-conta-lbl">Pago por qual conta (opcional)</label>
+        <input type="text" id="l-conta" list="dl-contas" placeholder="Ex: Bradesco"/>
+        <datalist id="dl-contas"></datalist>
+      </div>
+      <div class="field">
         <label>Nota / Observação (opcional)</label>
         <textarea id="l-obs" placeholder="Informações extras..."></textarea>
       </div>
@@ -689,9 +694,10 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
     <div class="mt">Lançar falando</div>
     <div class="mb">
       <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px" id="voz-ajuda">
-        Toque em gravar e vá falando os pagamentos, um atrás do outro. Pode pausar e continuar:
-        eu só leio quando você mandar. Ex: <i>"paguei mil e duzentos de tecido pro Paulo hoje,
-        e trezentos pra Maria da costura ontem"</i>.
+        Toque em gravar e fale o pagamento. Se estiver tudo claro, eu já lanço e você dita o
+        próximo; se faltar algo, eu pergunto. Pode falar vários de uma vez também.<br>
+        Ex: <i>"pagamento dia 10 de agosto, vale-transporte dos funcionários da Tijuca,
+        oitocentos reais, pago pela conta do Bradesco"</i>.
       </div>
       <button class="voz-btn" id="voz-btn" onclick="alternarGravacao()">
         <svg class="ic"><use href="#i-mic"/></svg><span id="voz-btn-txt">Gravar</span>
@@ -701,7 +707,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
         <label>O que eu ouvi <span style="font-weight:400;text-transform:none;letter-spacing:0">(dá para corrigir antes de lançar)</span></label>
         <textarea id="voz-texto" class="voz-txt" placeholder="O texto aparece aqui enquanto você fala."></textarea>
       </div>
-      <button class="btn-p btn-green" style="margin-top:0" onclick="lancarPelaVoz()">Ler e preparar os lançamentos</button>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="lancarPelaVoz()">Lançar o que eu falei</button>
+      <div id="voz-feito"></div>
       <button class="btn-p btn-ghost" onclick="limparVoz()">Limpar o texto</button>
       <button class="btn-p btn-ghost" onclick="fecharVoz()">Fechar</button>
     </div>
@@ -744,6 +751,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 // ══════════════════════════════════════════════════
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
 const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1', SK_R = 'fc_revisao_v1';
+const SK_CT = 'fc_contas_v1';
 const SK_EX = 'fc_extrato_v1', SK_CHAT = 'fc_chat_v1', SK_ONB = 'fc_onboard_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
@@ -831,6 +839,9 @@ let revisao  = JSON.parse(localStorage.getItem(SK_R)||'[]');
 // Linhas de extrato já resolvidas (lançadas ou ignoradas), para não perguntar de novo
 // quando ele importar um extrato com período sobreposto.
 let extratoVistos = JSON.parse(localStorage.getItem(SK_EX)||'{}');
+// De onde o dinheiro saiu ou entrou ("Bradesco", "Itaú", "dinheiro"). A lista
+// se monta sozinha conforme ele fala ou digita, para não virar mais um cadastro.
+let contas   = JSON.parse(localStorage.getItem(SK_CT)||'[]');
 let chatHist = JSON.parse(localStorage.getItem(SK_CHAT)||'[]');
 let jaConfigurou = localStorage.getItem(SK_ONB)==='1';
 
@@ -854,6 +865,7 @@ function save(){
     localStorage.setItem(SK_FX,JSON.stringify(fixas));
     localStorage.setItem(SK_R,JSON.stringify(revisao));
     localStorage.setItem(SK_EX,JSON.stringify(extratoVistos));
+    localStorage.setItem(SK_CT,JSON.stringify(contas));
     localStorage.setItem(SK_CHAT,JSON.stringify(chatHist.slice(-40)));
     return true;
   }catch(e){
@@ -981,6 +993,37 @@ function compsAbertos(){ return compromissos.filter(c=>!compQuitado(c)); }
 
 const norm = s => (s||'').toString().trim().toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+// ── DE ONDE SAIU O DINHEIRO ──
+// Ele fala "pago pela conta do Bradesco". Em vez de obrigar a cadastrar bancos
+// antes de usar, a lista aprende sozinha e reaproveita o nome já usado, para
+// não acabar com "Bradesco", "bradesco" e "conta do Bradesco" separados.
+function limparNomeConta(nome){
+  return (nome||'').toString()
+    .replace(/^\s*(pela\s+|pelo\s+|na\s+|no\s+|da\s+|do\s+)?conta\s+(corrente\s+)?(d[oa]\s+)?/i,'')
+    .replace(/^\s*(banco|pela|pelo)\s+/i,'')
+    .replace(/\s{2,}/g,' ').trim();
+}
+function acharConta(nome){
+  const n=norm(limparNomeConta(nome));
+  if(!n) return null;
+  return contas.find(c=>norm(c)===n)
+      || contas.find(c=>{ const m=norm(c); return m.length>=3 && (m.includes(n)||n.includes(m)); })
+      || null;
+}
+// Devolve o nome canônico e guarda o novo, se for novo.
+function registrarConta(nome){
+  const limpo=limparNomeConta(nome);
+  if(!limpo) return '';
+  const ja=acharConta(limpo);
+  if(ja) return ja;
+  contas.push(limpo);
+  return limpo;
+}
+function contasUsadas(){
+  const usadas=new Set(lancamentos.map(l=>l.conta).filter(Boolean));
+  return contas.filter(c=>usadas.has(c)).concat(contas.filter(c=>!usadas.has(c)));
+}
 
 // Acha um compromisso em aberto cujo fornecedor bate com o do comprovante,
 // para vincular o pagamento parcial automaticamente.
@@ -1522,6 +1565,8 @@ function renderRelatorio(){
     html+=`</div>`;
   }
 
+  html+=blocoContas(data);
+
   if(Object.keys(byMaq).length){
     html+=`<div class="rel-block"><div class="rel-head">Por máquina</div>`;
     html+=Object.entries(byMaq).map(([mid,val])=>{
@@ -1805,6 +1850,27 @@ function blocoFornecedores(data){
     + `</div>`;
 }
 
+// Quanto saiu e entrou por banco no período, para bater com o extrato.
+function blocoContas(data){
+  const porConta={};
+  data.filter(l=>norm(l.conta)).forEach(l=>{
+    const k=norm(l.conta);
+    if(!porConta[k]) porConta[k]={nome:l.conta,entrou:0,saiu:0,n:0};
+    if(l.tipo==='in') porConta[k].entrou+=(l.valor_liquido||l.valor||0);
+    else porConta[k].saiu+=(l.valor||0);
+    porConta[k].n++;
+  });
+  const linhas=Object.values(porConta).sort((a,b)=>(b.entrou+b.saiu)-(a.entrou+a.saiu));
+  if(!linhas.length) return '';
+  return `<div class="rel-block"><div class="rel-head">Por conta</div>`
+    + linhas.map(c=>`<div class="rel-row">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:600">${esc(c.nome)}</div>
+        <div style="font-size:10px;color:var(--green)">+${fmt(c.entrou)} / <span style="color:var(--red)">−${fmt(c.saiu)}</span></div></div>
+        <div class="rel-val" style="color:${(c.entrou-c.saiu)>=0?'var(--green)':'var(--red)'}">${fmt(c.entrou-c.saiu)}</div>
+      </div>`).join('')
+    + `</div>`;
+}
+
 // ══════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════
@@ -1837,6 +1903,17 @@ function renderConfig(){
       <div class="row-info"><div class="row-name">${esc(s.name)}</div><div class="row-meta">Retirada no período: ${fmt(totalSocio(s.id))}</div></div>
       <div class="chev"><svg class="ic ic-sm"><use href="#i-chevron"/></svg></div>
     </div>`).join('')}</div>
+
+  <div class="sh"><div class="st">Contas e bancos</div><div class="sa" onclick="openAddConta()">+ Nova</div></div>
+  <div style="font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.5">De onde o dinheiro sai e entra. A lista se monta sozinha conforme você lança — só mexa aqui se quiser corrigir um nome.</div>
+  ${contas.length?`<div class="lst">${contas.map((c,i)=>`
+    <div class="row" onclick="openEditConta(${i})">
+      <div class="row-ico"><svg class="ic"><use href="#i-bank"/></svg></div>
+      <div class="row-info"><div class="row-name">${esc(c)}</div>
+        <div class="row-meta">${lancamentos.filter(l=>l.conta===c).length} lançamento(s)</div></div>
+      <div class="chev"><svg class="ic ic-sm"><use href="#i-chevron"/></svg></div>
+    </div>`).join('')}</div>`
+  :`<div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center;font-size:12px;color:var(--muted)">Nenhuma conta ainda. Diga "pago pela conta do Bradesco" num lançamento e ela aparece aqui.</div>`}
 
   <div class="sh"><div class="st">Contas fixas mensais</div>
     <div style="display:flex;gap:14px"><div class="sa" onclick="openImportFixas()">Importar lista</div><div class="sa" onclick="openAddFixa()">+ Nova</div></div></div>
@@ -1957,6 +2034,32 @@ function openAddUnit(){
   units.push({id:'u'+Date.now(),name:name.trim()});
   save(); renderConfig();
 }
+function openAddConta(){
+  const nome=prompt('Nome da conta (ex: Bradesco, Itaú, dinheiro):');
+  if(!nome||!nome.trim()) return;
+  registrarConta(nome);
+  save(); renderConfig();
+}
+function openEditConta(i){
+  const atual=contas[i]; if(atual===undefined) return;
+  const nome=prompt('Nome da conta (deixe vazio para remover):',atual);
+  if(nome===null) return;
+  const novo=limparNomeConta(nome);
+  if(!novo){
+    const usos=lancamentos.filter(l=>l.conta===atual).length;
+    if(usos && !confirm(`${usos} lançamento(s) usam "${atual}". Remover a conta deles também?`)) return;
+    lancamentos.forEach(l=>{ if(l.conta===atual) l.conta=''; });
+    contas.splice(i,1);
+    save(); renderConfig(); showToast('del','Conta removida');
+    return;
+  }
+  // Renomear leva junto os lançamentos, senão eles ficariam órfãos.
+  lancamentos.forEach(l=>{ if(l.conta===atual) l.conta=novo; });
+  revisao.forEach(r=>{ if(r.conta===atual) r.conta=novo; });
+  contas[i]=novo;
+  save(); renderConfig(); showToast('ok','Conta renomeada');
+}
+
 function openEditUnit(id){
   const u=units.find(x=>x.id===id); if(!u) return;
   const name=prompt('Nome:',u.name); if(name===null) return;
@@ -1990,6 +2093,9 @@ function populateLancModal(tipo){
   document.getElementById('l-unit').innerHTML=units.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
   populateCompSelect();
   populateFixaSelect();
+  document.getElementById('dl-contas').innerHTML=contasUsadas().map(c=>`<option value="${esc(c)}"></option>`).join('');
+  document.getElementById('l-conta-lbl').textContent=
+    tipo==='in'?'Recebido em qual conta (opcional)':'Pago por qual conta (opcional)';
   document.getElementById('l-tipo').value=tipo;
   onTipoChange();
 }
@@ -2032,6 +2138,8 @@ function onTipoChange(){
   document.getElementById('l-fixa-wrap').style.display=isIn?'none':'block';
   document.getElementById('l-venc-wrap').style.display=isIn?'none':'block';
   document.getElementById('l-data-lbl').textContent=isIn?'Data':'Data do pagamento';
+  document.getElementById('l-conta-lbl').textContent=
+    isIn?'Recebido em qual conta (opcional)':'Pago por qual conta (opcional)';
   calcAtraso();
   if(!isIn) populateCompSelect();
   onCompChange();
@@ -2097,6 +2205,7 @@ function openLanc(tipo){
   document.getElementById('l-valor').value='';
   document.getElementById('l-desc').value='';
   document.getElementById('l-forn').value='';
+  document.getElementById('l-conta').value='';
   document.getElementById('l-obs').value='';
   document.getElementById('l-data').value=today();
   document.getElementById('l-venc').value='';
@@ -2121,6 +2230,7 @@ function openEditLanc(id){
   document.getElementById('l-cat').value=l.cat;
   document.getElementById('l-desc').value=l.desc||'';
   document.getElementById('l-forn').value=l.forn||'';
+  document.getElementById('l-conta').value=l.conta||'';
   document.getElementById('l-obs').value=l.obs||'';
   document.getElementById('l-data').value=l.data;
   document.getElementById('l-venc').value=l.data_venc||'';
@@ -2178,6 +2288,7 @@ function saveLanc(){
     data_venc:tipo==='out'?(document.getElementById('l-venc').value||null):null,
     data_rec:rec,
     desc, forn,
+    conta:registrarConta(document.getElementById('l-conta').value),
     obs:document.getElementById('l-obs').value,
     unit:unitId,
     comp_id:compId,
@@ -2277,9 +2388,14 @@ let recon=null, gravando=false, vozFinal='', vozParcial='', vozPararPedido=false
 
 function temDitado(){ return !!vozAPI(); }
 
+// O que já entrou no caixa nesta rodada de ditado, para ele ver e poder desfazer.
+let vozLancados=[];
+
 function openVoz(){
   vozFinal=document.getElementById('voz-texto').value||'';
   vozParcial='';
+  vozLancados=[];
+  document.getElementById('voz-feito').innerHTML='';
   ajustarTelaVoz();
   openMo('mo-voz');
 }
@@ -2364,7 +2480,7 @@ function estadoGravacao(on){
     ? `<span class="voz-ondas"><i></i><i></i><i></i><i></i><i></i></span><span id="voz-btn-txt">Parar</span>`
     : `<svg class="ic"><use href="#i-mic"/></svg><span id="voz-btn-txt">${vozFinal.trim()?'Continuar falando':'Gravar'}</span>`;
   if(on) document.getElementById('voz-status').textContent='Ouvindo… pode falar um pagamento atrás do outro.';
-  else if(vozFinal.trim()) document.getElementById('voz-status').textContent='Confira o texto e toque em "Ler e preparar".';
+  else if(vozFinal.trim()) document.getElementById('voz-status').textContent='Confira o texto e toque em "Lançar o que eu falei".';
 }
 
 function pintarVoz(){
@@ -2424,17 +2540,56 @@ REGRAS
 - "paguei", "mandei", "comprei", "tirei", "dei" → tipo "out". "recebi", "entrou", "vendi", "caiu" → tipo "in".
 - Se ele se corrigir ("não, foram trezentos"), vale a última versão. Junte o que for claramente o mesmo pagamento.
 - Se ele disser um total e as parcelas ("mil, paguei trezentos"), devolva valor=300 e valor_total=1000.
-- Só preencha "unit" se ele disser a loja. Só preencha "cat" se der para saber; senão null e escreva o que faltou em "duvidas".
+- Só preencha "unit" se ele disser a loja. Se ele disser um nome de loja que NÃO está na lista acima, devolva unit=null e o nome falado em "unit_falada" — não force numa loja parecida.
+- "conta" é de onde saiu ou entrou o dinheiro, quando ele disser: "pago pela conta do Bradesco" → conta:"Bradesco". Devolva só o nome ("Bradesco", "Itaú", "dinheiro"), sem "conta do". Contas que ele já usou: ${contas.length?contas.join(', '):'(nenhuma ainda)'} — reaproveite o nome igual quando for a mesma.
+- Só preencha "cat" se der para saber; senão null e escreva o que faltou em "duvidas".
 - NÃO INVENTE. Reconhecimento de voz erra número e nome: se ficar em dúvida, devolva null no campo e explique em "duvidas", em português simples. É melhor perguntar do que errar.
 - Ignore o que não for lançamento ("deixa eu ver", "peraí", "acabou").
 - Em "frase", devolva o pedaço da fala que gerou aquele lançamento, para ele conferir.
 - Se a fala não tiver nenhum pagamento, devolva {"lancamentos":[]}.
 
 Retorne APENAS JSON, sem texto em volta:
-{"lancamentos":[{"tipo":"in"|"out","valor":número ou null,"cat":"id_categoria ou null","desc":"descrição curta","forn":"quem recebeu ou null","data":"YYYY-MM-DD","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":null,"comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","frase":"trecho da fala","duvidas":["o que ficou incerto"]}]}`;
+{"lancamentos":[{"tipo":"in"|"out","valor":número ou null,"cat":"id_categoria ou null","desc":"descrição curta","forn":"quem recebeu ou null","conta":"de onde saiu o dinheiro ou null","data":"YYYY-MM-DD","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","unit_falada":"loja que ele falou e não existe, ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":null,"comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","frase":"trecho da fala","duvidas":["o que ficou incerto"]}]}
+
+Exemplo: "pagamento feito dia 10 de agosto, vale-transporte funcionários de Copacabana, oitocentos reais, pago pela conta do Bradesco" com Copacabana fora da lista de lojas →
+{"tipo":"out","valor":800,"cat":"funcionarios","desc":"Vale-transporte funcionários","forn":null,"conta":"Bradesco","data":"${hoje.slice(0,4)}-08-10","data_venc":null,"unit":null,"unit_falada":"Copacabana","tipo_pag":null,"maquina_id":null,"comp_id":null,"valor_total":null,"fixa_id":null,"frase":"vale-transporte funcionários de Copacabana oitocentos reais","duvidas":["Copacabana não é uma das lojas cadastradas"]}`;
 
   const r=await chamarIA(prompt, 3000);
   return Array.isArray(r) ? r : (Array.isArray(r.lancamentos)?r.lancamentos:[]);
+}
+
+function renderVozLancados(pendentes){
+  const el=document.getElementById('voz-feito');
+  if(!el) return;
+  if(!vozLancados.length && !pendentes){ el.innerHTML=''; return; }
+  const n=vozLancados.length;
+  el.innerHTML=`
+    ${n?`<div class="divider"></div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">Já entrou no caixa (${n})</div>
+    <div class="lst">${vozLancados.map(l=>`
+      <div class="row">
+        <div class="row-ico"><span class="sw" style="background:${getCat(l.cat).cor}"></span></div>
+        <div class="row-info">
+          <div class="row-name">${esc(l.desc)}</div>
+          <div class="row-meta">${getCat(l.cat).label} · ${esc(getUnit(l.unit).name)}${l.conta?' · '+esc(l.conta):''}</div>
+        </div>
+        <div class="row-right">
+          <div class="row-val" style="color:${l.tipo==='in'?'var(--green)':'var(--red)'}">${l.tipo==='in'?'+':'−'}${fmt(l.valor)}</div>
+          <div class="row-sub" style="color:var(--accent);cursor:pointer" onclick="desfazerVoz('${l.id}')">desfazer</div>
+        </div>
+      </div>`).join('')}</div>`:''}
+    ${pendentes?`<div class="note" style="margin-top:10px">${pendentes===1?'1 lançamento ficou faltando informação':pendentes+' lançamentos ficaram faltando informação'}.
+      <span style="color:var(--accent);cursor:pointer" onclick="closeMo('mo-voz');setTab('revisao')">Conferir agora</span>.</div>`:''}
+    ${n?`<div class="note" style="margin-top:10px">Pode continuar ditando o próximo. Para ver tudo, abra Lançamentos.</div>`:''}`;
+}
+
+function desfazerVoz(id){
+  const i=vozLancados.findIndex(l=>l.id===id); if(i<0) return;
+  lancamentos=lancamentos.filter(l=>l.id!==id);
+  vozLancados.splice(i,1);
+  save();
+  renderVozLancados(0);
+  showToast('del','Lançamento desfeito');
 }
 
 async function lancarPelaVoz(){
@@ -2460,23 +2615,35 @@ async function lancarPelaVoz(){
       document.getElementById('voz-status').textContent='Não achei nenhum pagamento nessa fala. Tente dizer o valor e para quem foi.';
       return;
     }
+    // O que está completo entra no caixa na hora: ele dita um pagamento, vê
+    // "lançado" e já dita o próximo. Só o que ficou faltando algo vai para a
+    // fila de conferência.
+    let lancados=0, pendentes=0;
     lista.forEach(res=>{
       const it=montarItemRevisao(res,null,'Ditado');
       it.origem='voz';
       it.frase=res.frase||'';
-      revisao.push(it);
+      if(itemCompleto(it)){
+        const novo=lancarItem(it);
+        vozLancados.unshift({id:novo.id,desc:novo.desc,valor:novo.valor,tipo:novo.tipo,
+          cat:novo.cat,unit:novo.unit,conta:novo.conta,frase:it.frase});
+        lancados++;
+      }else{
+        revisao.push(it); pendentes++;
+      }
     });
     save();
     fill.style.width='100%';
     setTimeout(()=>{ ov.classList.add('hidden'); fill.style.width='0%'; tit.textContent='Lendo com IA...'; },400);
-    limparVoz(); closeMo('mo-voz');
-    const pend=lista.length-lista.filter((_,i)=>itemCompleto(revisao[revisao.length-lista.length+i])).length;
-    setTimeout(()=>{
-      setTab('revisao');
-      const n=lista.length;
-      if(pend) showToast('warn',`${n} lançamento${n===1?'':'s'} da sua fala · ${pend===1?'1 precisa':pend+' precisam'} de conferência`);
-      else showToast('ok',`${n} lançamento${n===1?' pronto':'s prontos'}. Confira e lance.`);
-    },450);
+    limparVoz();
+    renderVozLancados(pendentes);
+    if(lancados) showToast('ok',`${lancados} lançado${lancados===1?'':'s'}`);
+    if(pendentes && !lancados){
+      // Nada entrou: não adianta ficar no ditado, o lugar de resolver é a conferência.
+      closeMo('mo-voz');
+      setTimeout(()=>{ setTab('revisao');
+        showToast('warn',`${pendentes===1?'1 lançamento precisa':pendentes+' lançamentos precisam'} da sua conferência`); },450);
+    }
   }catch(e){
     ov.classList.add('hidden'); fill.style.width='0%'; tit.textContent='Lendo com IA...';
     document.getElementById('voz-status').textContent=e.message;
@@ -3121,6 +3288,8 @@ Este pagamento pode ser uma PARCELA de uma despesa maior. Observe indícios como
 - Se indica que é parte de um total maior que ainda não está na lista, devolva o total em "valor_total".
 - Se é pagamento único e completo, devolva ambos como null.
 
+Comprovante de banco costuma dizer de qual conta saiu o dinheiro. Devolva só o nome do banco em "conta" ("Bradesco", "Itaú"), sem número de agência. Contas que ele já usou: ${contas.length?contas.join(', '):'(nenhuma ainda)'} — reaproveite o nome igual quando for a mesma.
+
 Nas saídas há duas datas diferentes, não confunda:
 - "data" é o dia em que foi PAGO (data do pagamento, da transferência, do PIX).
 - "data_venc" é o VENCIMENTO impresso no boleto/conta ("Vencimento", "Vence em", "Data de vencimento"). Se o documento não trouxer vencimento, devolva null.
@@ -3130,7 +3299,7 @@ REGRA IMPORTANTE: não invente dados. Se algum campo não estiver legível ou n�
 Se a imagem não for um comprovante financeiro (foto aleatória, muito borrada, ilegível), devolva {"erro":"motivo curto"}.
 
 Retorne APENAS JSON, sem texto em volta:
-{"tipo":"in"|"out","valor":número,"cat":"id_categoria","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","data":"YYYY-MM-DD ou null","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":"id ou null","comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","duvidas":["o que ficou incerto"]}
+{"tipo":"in"|"out","valor":número,"cat":"id_categoria","desc":"descrição curta do que é","forn":"nome da pessoa/fornecedor/beneficiário ou null","conta":"banco de onde saiu/entrou o dinheiro, se o comprovante disser, ou null","data":"YYYY-MM-DD ou null","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":"id ou null","comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","duvidas":["o que ficou incerto"]}
 
 Exemplos:
 - Comprovante Stone R$ 250 débito → tipo:"in", valor:250, tipo_pag:"debito", cat:"venda_cartao", maquina_id da Stone
@@ -3254,6 +3423,12 @@ function estadoParaIA(){
   doPeriodo.filter(l=>l.tipo==='out'&&norm(l.forn)).forEach(l=>{
     porForn[l.forn]=+(((porForn[l.forn]||0)+(l.valor||0)).toFixed(2));
   });
+  const porConta={};
+  doPeriodo.filter(l=>norm(l.conta)).forEach(l=>{
+    const c=porConta[l.conta]=porConta[l.conta]||{entradas:0,saidas:0};
+    if(l.tipo==='in') c.entradas=+((c.entradas+(l.valor_liquido||l.valor||0)).toFixed(2));
+    else c.saidas=+((c.saidas+(l.valor||0)).toFixed(2));
+  });
 
   return {
     hoje:today(),
@@ -3265,6 +3440,7 @@ function estadoParaIA(){
       taxa_credito_2_6x:m.taxa_credito_2_6x,taxa_credito_7x:m.taxa_credito_7x,
       prazo_debito:m.prazo_debito,prazo_credito:m.prazo_credito})),
     socios: socios.map(s=>({id:s.id,nome:s.name})),
+    contas_bancarias: contas,
     contas_fixas: fixas.map(f=>({id:f.id,descricao:f.desc,valor:f.valor,
       categoria:f.cat,unidade:f.unit,dia_vencimento:f.dia})),
     categorias_saida: catsOut().map(c=>({id:c.id,nome:c.label})),
@@ -3275,6 +3451,7 @@ function estadoParaIA(){
       por_mes: porMes12,
       saidas_por_categoria_no_periodo: porCat,
       saidas_por_fornecedor_no_periodo: porForn,
+      movimento_por_conta_no_periodo: porConta,
       dre_do_periodo: calcularDRE(filter.regime||'competencia'),
     },
     despesas_parceladas_abertas: compsAbertos().map(c=>({id:c.id,descricao:c.desc,
@@ -3881,6 +4058,9 @@ function montarItemRevisao(res, imgKey, nome){
     cat: res.cat && getCatValida(res.cat,tipo) ? res.cat : null,
     desc: res.desc||'',
     forn: res.forn||'',
+    conta: res.conta?limparNomeConta(res.conta):'',
+    // Loja que ele falou e que não existe no cadastro: guardo para oferecer criar.
+    unit_falada: res.unit_falada||null,
     data: /^\d{4}-\d{2}-\d{2}$/.test(res.data||'')?res.data:today(),
     data_venc: /^\d{4}-\d{2}-\d{2}$/.test(res.data_venc||'')?res.data_venc:null,
     unit: (res.unit&&getUnit(res.unit).id)?res.unit:null,
@@ -4012,7 +4192,10 @@ function revRowHTML(it,i){
       <div class="row-meta">${isIn?'Entrada':'Saída'}${cat?' · '+cat.label:''}${it.unit?' · '+getUnit(it.unit).name:''} · ${fmtDate(it.data)}</div>
       ${it.origem==='extrato'?`<div class="rev-src">do extrato</div>`:''}
       ${it.origem==='voz'?`<div class="rev-src">do ditado</div>`:''}
+      ${it.conta?`<div class="rev-src" style="background:var(--s2);color:var(--text2)">${esc(it.conta)}</div>`:''}
       ${it.origem==='voz'&&it.frase?`<div class="rev-duv" style="font-style:italic">“${esc(it.frase)}”</div>`:''}
+      ${it.unit_falada&&!it.unit?`<div class="rev-duv">Você falou <b>${esc(it.unit_falada)}</b>, que não está nas suas lojas.
+        <span style="color:var(--accent)" onclick="event.stopPropagation();criarUnitFalada(${i})">Criar essa loja</span></div>`:''}
       ${pend.length?`<div class="rev-badge warn"><svg class="ic ic-sm"><use href="#i-alert"/></svg>Falta: ${pend.join(', ')}</div>`:`<div class="rev-badge ok"><svg class="ic ic-sm"><use href="#i-check"/></svg>Pronto</div>`}
       ${(it.duvidas||[]).map(d=>`<div class="rev-duv">${esc(d)}</div>`).join('')}
     </div>
@@ -4021,6 +4204,23 @@ function revRowHTML(it,i){
       <div class="row-sub" style="color:var(--muted)">toque para ${pend.length?'preencher':'ajustar'}</div>
     </div>
   </div>`;
+}
+
+// Ele falou uma loja que não existe no cadastro. Em vez de mandar ele ir em
+// Ajustes criar e voltar, cria aqui e já aplica neste lançamento.
+function criarUnitFalada(i){
+  const it=revisao[i]; if(!it||!it.unit_falada) return;
+  const nome=it.unit_falada.trim();
+  const ja=units.find(u=>norm(u.name)===norm(nome));
+  const id=ja?ja.id:('u'+Date.now()+units.length);
+  if(!ja) units.push({id,name:nome});
+  // Outros itens da mesma remessa que falaram a mesma loja aproveitam.
+  revisao.forEach(r=>{ if(!r.unit&&r.unit_falada&&norm(r.unit_falada)===norm(nome)){
+    r.unit=id; r.unit_falada=null;
+    r.duvidas=(r.duvidas||[]).filter(d=>!norm(d).includes(norm(nome)));
+  }});
+  save(); renderRevisao();
+  showToast('ok',ja?`Usando a loja "${nome}"`:`Loja "${nome}" criada`);
 }
 
 function aplicarUnitEmTodos(){
@@ -4042,6 +4242,7 @@ function openRevisaoItem(i){
   if(it.cat) document.getElementById('l-cat').value=it.cat;
   document.getElementById('l-desc').value=it.desc||'';
   document.getElementById('l-forn').value=it.forn||'';
+  document.getElementById('l-conta').value=it.conta||'';
   document.getElementById('l-obs').value=it.obs||'';
   document.getElementById('l-data').value=it.data||today();
   document.getElementById('l-venc').value=it.data_venc||'';
@@ -4081,6 +4282,7 @@ function salvarRevisaoItem(){
   it.cat=document.getElementById('l-cat').value||null;
   it.desc=document.getElementById('l-desc').value;
   it.forn=document.getElementById('l-forn').value;
+  it.conta=document.getElementById('l-conta').value;
   it.obs=document.getElementById('l-obs').value;
   it.data=document.getElementById('l-data').value||today();
   it.data_venc=(tipo==='out'?(document.getElementById('l-venc').value||null):null);
@@ -4126,38 +4328,46 @@ function descartarRevisaoItem(){
 }
 
 // Converte os itens prontos em lançamentos de verdade.
+// Um item conferido vira lançamento. Serve tanto para a remessa da noite quanto
+// para o ditado, que lança na hora quando não falta nada.
+function lancarItem(it){
+  let compId=it.comp_id||null;
+  if(!compId&&it.comp_novo_total){
+    const novo={id:'c'+Date.now()+Math.floor(Math.random()*10000),
+      desc:it.desc||getCat(it.cat).label,valor_total:it.comp_novo_total,
+      cat:it.cat,forn:it.forn,unit:it.unit,criado:today()};
+    compromissos.push(novo); compId=novo.id;
+  }
+  const maq=it.tipo==='in'?getMaq(it.maq_id):null;
+  const liq=it.tipo==='in'?calcLiquido(it.valor,it.pagtype,maq):it.valor;
+  const novo={
+    id:Date.now()+''+Math.floor(Math.random()*100000),
+    tipo:it.tipo, cat:it.cat,
+    val_bruto:it.tipo==='in'?it.valor:null,
+    valor:it.valor, valor_liquido:liq,
+    maq_id:it.tipo==='in'?it.maq_id:null,
+    pagtype:it.tipo==='in'?it.pagtype:null,
+    data:it.data,
+    data_venc:it.tipo==='out'?(it.data_venc||null):null,
+    data_rec:it.tipo==='in'?calcDataRec(it.pagtype,maq):null,
+    desc:it.desc||getCat(it.cat).label,
+    forn:it.forn,
+    conta:registrarConta(it.conta),
+    obs:it.obs, unit:it.unit,
+    comp_id:it.tipo==='out'?compId:null,
+    fixa_id:it.tipo==='out'?(it.fixa_id||null):null,
+    img_key:it.img_key||null,
+    extrato_fp:it.extrato_fp||null};
+  lancamentos.unshift(novo);
+  // Débito do extrato agora está lançado: não perguntar de novo numa reimportação.
+  if(it.extrato_fp) extratoVistos[it.extrato_fp]='lancado';
+  return novo;
+}
+
 function lancarRevisao(){
   const prontos=revisao.filter(itemCompleto);
   if(!prontos.length){ showToast('warn','Nenhum está pronto ainda'); return; }
-  prontos.forEach(it=>{
-    let compId=it.comp_id||null;
-    if(!compId&&it.comp_novo_total){
-      const novo={id:'c'+Date.now()+Math.floor(Math.random()*10000),
-        desc:it.desc||getCat(it.cat).label,valor_total:it.comp_novo_total,
-        cat:it.cat,forn:it.forn,unit:it.unit,criado:today()};
-      compromissos.push(novo); compId=novo.id;
-    }
-    const maq=it.tipo==='in'?getMaq(it.maq_id):null;
-    const liq=it.tipo==='in'?calcLiquido(it.valor,it.pagtype,maq):it.valor;
-    lancamentos.unshift({
-      id:Date.now()+''+Math.floor(Math.random()*100000),
-      tipo:it.tipo, cat:it.cat,
-      val_bruto:it.tipo==='in'?it.valor:null,
-      valor:it.valor, valor_liquido:liq,
-      maq_id:it.tipo==='in'?it.maq_id:null,
-      pagtype:it.tipo==='in'?it.pagtype:null,
-      data:it.data,
-      data_venc:it.tipo==='out'?(it.data_venc||null):null,
-      data_rec:it.tipo==='in'?calcDataRec(it.pagtype,maq):null,
-      desc:it.desc||getCat(it.cat).label,
-      forn:it.forn, obs:it.obs, unit:it.unit,
-      comp_id:it.tipo==='out'?compId:null,
-      fixa_id:it.tipo==='out'?(it.fixa_id||null):null,
-      img_key:it.img_key||null,
-      extrato_fp:it.extrato_fp||null});
-    // Débito do extrato agora está lançado: não perguntar de novo numa reimportação.
-    if(it.extrato_fp) extratoVistos[it.extrato_fp]='lancado';
-  });
+  prontos.forEach(lancarItem);
   const n=prontos.length;
   revisao=revisao.filter(r=>!itemCompleto(r));
   save();
