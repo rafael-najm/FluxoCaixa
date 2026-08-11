@@ -106,6 +106,32 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   background:var(--text);color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;
   justify-content:center;padding:0 5px;border:2px solid var(--bg);font-variant-numeric:tabular-nums;}
 .fab-badge.hidden{display:none;}
+/* O microfone fica logo acima do +, para ditar sem tirar a foto do caminho. */
+.fab-voz{position:fixed;bottom:calc(var(--nav-h) + 76px);right:16px;width:52px;height:52px;
+  border-radius:10px;background:var(--s1);color:var(--text);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 2px 8px rgba(21,24,29,.10);z-index:99;
+  transition:transform .22s ease,opacity .22s ease;}
+.fab-voz:active{transform:scale(.94);}
+.fab-voz.fab-oculto{transform:translateY(250%);opacity:0;pointer-events:none;}
+.fab-voz.hidden{display:none;}
+
+/* ── DITADO ── */
+.voz-btn{width:100%;border:none;border-radius:10px;padding:22px 16px;background:var(--accent);
+  color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;
+  gap:10px;cursor:pointer;font-family:inherit;}
+.voz-btn.gravando{background:var(--red);}
+.voz-btn:disabled{opacity:.5;}
+.voz-ondas{display:flex;align-items:center;gap:3px;height:18px;}
+.voz-ondas i{width:3px;height:6px;border-radius:2px;background:currentColor;
+  animation:vozpulso .9s ease-in-out infinite;}
+.voz-ondas i:nth-child(2){animation-delay:.15s}
+.voz-ondas i:nth-child(3){animation-delay:.3s}
+.voz-ondas i:nth-child(4){animation-delay:.45s}
+.voz-ondas i:nth-child(5){animation-delay:.6s}
+@keyframes vozpulso{0%,100%{height:6px;opacity:.55}50%{height:18px;opacity:1}}
+.voz-txt{min-height:120px;}
+.voz-parcial{color:var(--muted);}
 
 /* ── SALDO ── */
 .hero{margin:0 0 16px;background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:20px;}
@@ -389,6 +415,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13 5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></symbol>
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18l-1.8-5.4L4.5 10.8 10.2 9z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></symbol>
   <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M16 9.5l4 5M20 9.5l-4 5"/></symbol>
 </defs></svg>
 <div id="app">
@@ -419,6 +447,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   </nav>
 </div>
 
+<button class="fab-voz" id="fab-voz" onclick="openVoz()" aria-label="Lançar falando"><svg class="ic"><use href="#i-mic"/></svg></button>
 <button class="fab-main" id="fab-main" onclick="pickFiles()" aria-label="Enviar comprovantes"><svg class="ic"><use href="#i-plus"/></svg><span class="fab-badge hidden" id="fab-badge"></span></button>
 <input type="file" id="file-in" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files);this.value=''"/>
 <input type="file" id="file-extrato" accept=".ofx,.csv,.txt,text/plain,text/csv,application/x-ofx" style="display:none" onchange="extratoDeArquivo(this.files);this.value=''"/>
@@ -649,6 +678,32 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
       <button class="btn-p btn-green" onclick="saveFixa()">Salvar conta fixa</button>
       <button class="btn-p btn-ghost" onclick="closeMo('mo-fixa')">Cancelar</button>
       <button class="btn-p btn-del" id="fx-del-btn" onclick="deleteFixa()" style="display:none">Excluir conta fixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DITADO -->
+<div class="mo" id="mo-voz">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">Lançar falando</div>
+    <div class="mb">
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px" id="voz-ajuda">
+        Toque em gravar e vá falando os pagamentos, um atrás do outro. Pode pausar e continuar:
+        eu só leio quando você mandar. Ex: <i>"paguei mil e duzentos de tecido pro Paulo hoje,
+        e trezentos pra Maria da costura ontem"</i>.
+      </div>
+      <button class="voz-btn" id="voz-btn" onclick="alternarGravacao()">
+        <svg class="ic"><use href="#i-mic"/></svg><span id="voz-btn-txt">Gravar</span>
+      </button>
+      <div id="voz-status" style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px"></div>
+      <div class="field" style="margin-top:14px">
+        <label>O que eu ouvi <span style="font-weight:400;text-transform:none;letter-spacing:0">(dá para corrigir antes de lançar)</span></label>
+        <textarea id="voz-texto" class="voz-txt" placeholder="O texto aparece aqui enquanto você fala."></textarea>
+      </div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="lancarPelaVoz()">Ler e preparar os lançamentos</button>
+      <button class="btn-p btn-ghost" onclick="limparVoz()">Limpar o texto</button>
+      <button class="btn-p btn-ghost" onclick="fecharVoz()">Fechar</button>
     </div>
   </div>
 </div>
@@ -896,7 +951,12 @@ function resizeImg(file, maxDim, quality){
 // ══════════════════════════════════════════════════
 const fmt = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
 const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const today = () => new Date().toISOString().split('T')[0];
+// Data do relógio dele, não a de Londres: no Brasil, depois das 21h o
+// toISOString() já virou o dia e datava tudo para amanhã — bem na hora em que
+// ele senta para lançar a noite.
+const today = () => { const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const DIAS_SEMANA=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
 const fmtDate = d => { if(!d)return''; const[y,m,dd]=d.split('-'); return`${dd}/${m}`; };
 const fmtDateFull = d => { if(!d)return''; const[y,m,dd]=d.split('-'); return`${dd}/${m}/${y}`; };
 
@@ -963,7 +1023,7 @@ function calcLiquido(bruto, tipo, maq){
 function calcDataRec(tipo, maq){
   if(!maq||tipo==='pix') return today();
   const p = tipo==='debito'?maq.prazo_debito:maq.prazo_credito;
-  const d=new Date(); d.setDate(d.getDate()+p); return d.toISOString().split('T')[0];
+  const d=new Date(); d.setDate(d.getDate()+p); return ymd(d);
 }
 
 // ── PERIOD FILTER ──
@@ -1126,9 +1186,11 @@ function setTab(tab){
   document.getElementById('period-bar').style.display=tab==='revisao'?'none':'flex';
   // O + some nas telas de leitura para não cobrir os números do relatório.
   const semFab=['revisao','relatorio','config'].includes(tab);
-  const fab=document.getElementById('fab-main');
-  fab.classList.toggle('hidden',semFab);
-  fab.classList.remove('fab-oculto');
+  ['fab-main','fab-voz'].forEach(id=>{
+    const f=document.getElementById(id);
+    f.classList.toggle('hidden',semFab);
+    f.classList.remove('fab-oculto');
+  });
   _scrollAnt=0;
   renderPage(tab);
 }
@@ -1146,14 +1208,15 @@ let _scrollAnt=0, _fabT=null;
 function ligarFabScroll(){
   document.querySelectorAll('.content').forEach(c=>{
     c.addEventListener('scroll',()=>{
-      const f=document.getElementById('fab-main');
-      if(!f||f.classList.contains('hidden')) return;
+      const fs=['fab-main','fab-voz'].map(id=>document.getElementById(id))
+        .filter(f=>f&&!f.classList.contains('hidden'));
+      if(!fs.length) return;
       const y=c.scrollTop;
-      if(y>_scrollAnt+8 && y>90) f.classList.add('fab-oculto');
-      else if(y<_scrollAnt-8) f.classList.remove('fab-oculto');
+      if(y>_scrollAnt+8 && y>90) fs.forEach(f=>f.classList.add('fab-oculto'));
+      else if(y<_scrollAnt-8) fs.forEach(f=>f.classList.remove('fab-oculto'));
       _scrollAnt=y;
       clearTimeout(_fabT);
-      _fabT=setTimeout(()=>f.classList.remove('fab-oculto'),700);
+      _fabT=setTimeout(()=>fs.forEach(f=>f.classList.remove('fab-oculto')),700);
     },{passive:true});
   });
 }
@@ -2202,6 +2265,225 @@ function deleteFixa(){
 }
 
 // ══════════════════════════════════════════════════
+// LANÇAR FALANDO
+// ══════════════════════════════════════════════════
+// Ele fala a noite inteira de pagamentos e o celular escreve. O ditado é do
+// próprio aparelho (não gasta crédito); só o texto final vai para a IA, que
+// separa a fala em vários lançamentos. Nada entra sem ele conferir.
+// Resolvido na hora do uso: em alguns navegadores o reconhecimento só aparece
+// depois que a página carrega.
+const vozAPI = () => window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let recon=null, gravando=false, vozFinal='', vozParcial='', vozPararPedido=false;
+
+function temDitado(){ return !!vozAPI(); }
+
+function openVoz(){
+  vozFinal=document.getElementById('voz-texto').value||'';
+  vozParcial='';
+  ajustarTelaVoz();
+  openMo('mo-voz');
+}
+function fecharVoz(){ pararGravacao(); closeMo('mo-voz'); }
+function limparVoz(){
+  vozFinal=''; vozParcial='';
+  document.getElementById('voz-texto').value='';
+  document.getElementById('voz-status').textContent='';
+}
+
+// Sem reconhecimento no navegador (iPhone em tela cheia, WebView antiga) ele
+// ainda dita: todo teclado de celular tem um microfone. Só troco as instruções.
+function ajustarTelaVoz(){
+  const btn=document.getElementById('voz-btn');
+  if(temDitado()) return;
+  btn.style.display='none';
+  document.getElementById('voz-ajuda').innerHTML=
+    `Este navegador não grava direto. Toque no campo abaixo e use o <b>microfone do seu teclado</b> `+
+    `para falar — funciona igual. Depois toque em "Ler e preparar os lançamentos".`;
+}
+
+function alternarGravacao(){ gravando?pararGravacao():comecarGravacao(); }
+
+function comecarGravacao(){
+  if(!temDitado()){ showToast('warn','Use o microfone do teclado'); return; }
+  vozFinal=document.getElementById('voz-texto').value||'';
+  if(vozFinal && !/\s$/.test(vozFinal)) vozFinal+=' ';
+  vozPararPedido=false;
+  recon=new (vozAPI())();
+  recon.lang='pt-BR';
+  recon.continuous=true;
+  recon.interimResults=true;
+  recon.onresult=e=>{
+    let parcial='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) vozFinal+=t.replace(/\s+$/,'')+' ';
+      else parcial+=t;
+    }
+    vozParcial=parcial;
+    pintarVoz();
+  };
+  // O Android encerra sozinho a cada pausa; religo até ele mandar parar, senão
+  // a gravação morreria toda vez que ele respirasse entre um pagamento e outro.
+  recon.onend=()=>{
+    if(vozPararPedido){ estadoGravacao(false); return; }
+    try{ recon.start(); }catch(e){ estadoGravacao(false); }
+  };
+  recon.onerror=e=>{
+    const err=e.error||'';
+    if(err==='no-speech') return;                 // silêncio: o onend religa
+    vozPararPedido=true;
+    estadoGravacao(false);
+    if(err==='not-allowed'||err==='service-not-allowed'){
+      document.getElementById('voz-status').textContent=
+        'O microfone está bloqueado. Libere o microfone para este site nos ajustes do navegador — ou use o microfone do teclado, no campo abaixo.';
+    } else if(err==='network'){
+      document.getElementById('voz-status').textContent='Sem internet para o ditado. Use o microfone do teclado no campo abaixo.';
+    } else {
+      document.getElementById('voz-status').textContent='O ditado parou. Toque em Gravar de novo.';
+    }
+  };
+  try{ recon.start(); estadoGravacao(true); }
+  catch(e){ estadoGravacao(false); showToast('warn','Não consegui abrir o microfone'); }
+}
+
+function pararGravacao(){
+  vozPararPedido=true;
+  if(recon){ try{ recon.stop(); }catch(e){} }
+  // O que ficou no ar quando ele parou também é fala dele.
+  if(vozParcial){ vozFinal+=vozParcial+' '; vozParcial=''; }
+  pintarVoz();
+  estadoGravacao(false);
+}
+
+function estadoGravacao(on){
+  gravando=on;
+  const btn=document.getElementById('voz-btn');
+  if(!btn) return;
+  btn.classList.toggle('gravando',on);
+  btn.innerHTML=on
+    ? `<span class="voz-ondas"><i></i><i></i><i></i><i></i><i></i></span><span id="voz-btn-txt">Parar</span>`
+    : `<svg class="ic"><use href="#i-mic"/></svg><span id="voz-btn-txt">${vozFinal.trim()?'Continuar falando':'Gravar'}</span>`;
+  if(on) document.getElementById('voz-status').textContent='Ouvindo… pode falar um pagamento atrás do outro.';
+  else if(vozFinal.trim()) document.getElementById('voz-status').textContent='Confira o texto e toque em "Ler e preparar".';
+}
+
+function pintarVoz(){
+  const ta=document.getElementById('voz-texto');
+  if(!ta) return;
+  ta.value=(vozFinal+vozParcial).replace(/\s{2,}/g,' ');
+  ta.scrollTop=ta.scrollHeight;
+}
+
+// A fala vira uma lista de lançamentos. Mesmos campos do leitor de comprovante,
+// para cair no mesmo item de revisão.
+async function lerFalaLancamentos(texto){
+  const listaCatOut=catsOut().map(c=>`- ${c.id}: ${c.label}`).join('\n');
+  const listaCatIn=CAT_IN.map(c=>`- ${c.id}: ${c.label}`).join('\n');
+  const listaUnits=units.map(u=>`- ${u.id}: ${u.name}`).join('\n');
+  const listaSocios=socios.map(s=>`- pessoal_${s.id}: retirada do ${s.name}`).join('\n')||'(nenhum)';
+  const abertos=compsAbertos();
+  const listaComp=abertos.length
+    ? abertos.map(c=>`- id:${c.id} | ${c.desc} | fornecedor: ${c.forn||'não informado'} | total ${fmt(c.valor_total)} | falta ${fmt(compSaldo(c))}`).join('\n')
+    : '(nenhuma)';
+  const listaFixas=fixas.length
+    ? fixas.map(f=>`- id:${f.id} | ${f.desc} | ${getCat(f.cat).label} | ${fmt(f.valor)}/mês | unidade:${f.unit}`).join('\n')
+    : '(nenhuma)';
+  const hoje=today();
+
+  const prompt=`Você transforma a fala de um empresário brasileiro em lançamentos de caixa. Ele tem uma confecção de roupa feminina e lojas próprias, e está ditando no celular os pagamentos do dia, um atrás do outro, sem pontuação e às vezes se corrigindo no meio.
+
+FALA (transcrição do ditado, pode ter erro de reconhecimento):
+"""
+${texto}
+"""
+
+Hoje é ${hoje} (${DIAS_SEMANA[new Date(hoje+'T12:00:00').getDay()]}).
+
+Unidades:
+${listaUnits}
+
+Categorias de SAÍDA:
+${listaCatOut}
+
+Retiradas pessoais dos sócios (use quando ele disser o nome do sócio como quem recebeu, ex: "tirei tanto pro Theo"):
+${listaSocios}
+
+Categorias de ENTRADA:
+${listaCatIn}
+
+Contas fixas cadastradas (se ele estiver pagando uma delas, devolva "fixa_id"):
+${listaFixas}
+
+Despesas parceladas em aberto (se for mais uma parcela, devolva "comp_id"):
+${listaComp}
+
+REGRAS
+- Cada pagamento vira um objeto. Se ele falar cinco pagamentos numa frase só, devolva cinco objetos.
+- Valores por extenso viram número: "mil e duzentos"=1200, "trezentos e cinquenta"=350, "dois mil e quinhentos"=2500, "quinhentos e vinte reais e trinta centavos"=520.30. "mil e duzentos e cinquenta" = 1250.
+- Datas faladas viram YYYY-MM-DD: "hoje"=${hoje}, "ontem", "anteontem", "segunda passada", "dia 5". Se ele falar só o dia e esse dia ainda não chegou neste mês, é do mês passado. Sem data falada, use ${hoje}.
+- "paguei", "mandei", "comprei", "tirei", "dei" → tipo "out". "recebi", "entrou", "vendi", "caiu" → tipo "in".
+- Se ele se corrigir ("não, foram trezentos"), vale a última versão. Junte o que for claramente o mesmo pagamento.
+- Se ele disser um total e as parcelas ("mil, paguei trezentos"), devolva valor=300 e valor_total=1000.
+- Só preencha "unit" se ele disser a loja. Só preencha "cat" se der para saber; senão null e escreva o que faltou em "duvidas".
+- NÃO INVENTE. Reconhecimento de voz erra número e nome: se ficar em dúvida, devolva null no campo e explique em "duvidas", em português simples. É melhor perguntar do que errar.
+- Ignore o que não for lançamento ("deixa eu ver", "peraí", "acabou").
+- Em "frase", devolva o pedaço da fala que gerou aquele lançamento, para ele conferir.
+- Se a fala não tiver nenhum pagamento, devolva {"lancamentos":[]}.
+
+Retorne APENAS JSON, sem texto em volta:
+{"lancamentos":[{"tipo":"in"|"out","valor":número ou null,"cat":"id_categoria ou null","desc":"descrição curta","forn":"quem recebeu ou null","data":"YYYY-MM-DD","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":null,"comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","frase":"trecho da fala","duvidas":["o que ficou incerto"]}]}`;
+
+  const r=await chamarIA(prompt, 3000);
+  return Array.isArray(r) ? r : (Array.isArray(r.lancamentos)?r.lancamentos:[]);
+}
+
+async function lancarPelaVoz(){
+  if(gravando) pararGravacao();
+  const texto=(document.getElementById('voz-texto').value||'').trim();
+  if(!texto){ showToast('warn','Fale alguma coisa primeiro'); return; }
+  if(!localStorage.getItem(SK_KEY)){
+    showToast('warn','Configure a chave de IA em Config');
+    closeMo('mo-voz'); setTab('config'); return;
+  }
+  const ov=document.getElementById('proc-ov');
+  const tit=document.querySelector('.proc-title');
+  const sub=document.getElementById('proc-sub');
+  const fill=document.getElementById('proc-fill');
+  tit.textContent='Separando o que você falou...';
+  sub.textContent='Um instante';
+  fill.style.width='60%';
+  ov.classList.remove('hidden');
+  try{
+    const lista=await lerFalaLancamentos(texto);
+    if(!lista.length){
+      ov.classList.add('hidden'); fill.style.width='0%';
+      document.getElementById('voz-status').textContent='Não achei nenhum pagamento nessa fala. Tente dizer o valor e para quem foi.';
+      return;
+    }
+    lista.forEach(res=>{
+      const it=montarItemRevisao(res,null,'Ditado');
+      it.origem='voz';
+      it.frase=res.frase||'';
+      revisao.push(it);
+    });
+    save();
+    fill.style.width='100%';
+    setTimeout(()=>{ ov.classList.add('hidden'); fill.style.width='0%'; tit.textContent='Lendo com IA...'; },400);
+    limparVoz(); closeMo('mo-voz');
+    const pend=lista.length-lista.filter((_,i)=>itemCompleto(revisao[revisao.length-lista.length+i])).length;
+    setTimeout(()=>{
+      setTab('revisao');
+      const n=lista.length;
+      if(pend) showToast('warn',`${n} lançamento${n===1?'':'s'} da sua fala · ${pend===1?'1 precisa':pend+' precisam'} de conferência`);
+      else showToast('ok',`${n} lançamento${n===1?' pronto':'s prontos'}. Confira e lance.`);
+    },450);
+  }catch(e){
+    ov.classList.add('hidden'); fill.style.width='0%'; tit.textContent='Lendo com IA...';
+    document.getElementById('voz-status').textContent=e.message;
+  }
+}
+
+// ══════════════════════════════════════════════════
 // IMPORTAR CONTAS FIXAS COLADAS
 // ══════════════════════════════════════════════════
 // A lista das contas do mês vive numa planilha do escritório. Em vez de digitar
@@ -2753,7 +3035,7 @@ async function lerExtratoImagem(base64){
   const apiKey=localStorage.getItem(SK_KEY);
   if(!apiKey) throw new Error('Configure a chave de API em Config');
   const hoje=today();
-  const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})();
+  const ontem=(()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d);})();
   const prompt=`Esta imagem é um print do extrato de um banco brasileiro (app do celular ou internet banking). Extraia TODAS as linhas de transação visíveis.
 
 Como esses prints costumam ser:
@@ -3254,6 +3536,7 @@ REGRAS
 - Taxa é porcentagem (1.2 quer dizer 1,2%). Prazo é em dias.
 - Se ele pedir algo fora dessas ações, explique em uma frase o que ele mesmo faz na tela.
 - Nunca proponha remover nada sem ele ter pedido claramente.
+- Para lançar vários pagamentos de uma vez sem comprovante, ele pode falar: o botão de microfone, ao lado do +, grava e transforma a fala em lançamentos para ele conferir.
 - Contas fixas: até umas cinco você mesmo cria. Se ele tiver uma lista comprida, é mais rápido mandar ele abrir Config › Contas fixas mensais › "Importar lista" e colar tudo de uma vez.
 
 ATENÇÃO ÀS MAQUININHAS
@@ -3657,6 +3940,11 @@ function renderRevisao(){
         <div class="upzone-sub">Toque e selecione todos de uma vez.<br/>A IA identifica entradas e saídas sozinha.</div>
       </div>
       <button class="btn-p btn-ghost" style="margin-top:0" onclick="colarComprovante()">Colar comprovante copiado</button>
+      <div class="upzone" onclick="openVoz()" style="margin-top:14px">
+        <div class="upzone-ico"><svg class="ic"><use href="#i-mic"/></svg></div>
+        <div class="upzone-title">Lançar falando</div>
+        <div class="upzone-sub">Para o que não tem comprovante.<br/>Fale os pagamentos e eu separo um a um.</div>
+      </div>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-top:4px">
         <div style="font-size:12px;font-weight:700;margin-bottom:10px">O que a IA identifica</div>
         ${aiTipsHTML()}
@@ -3678,7 +3966,7 @@ function renderRevisao(){
 
   let html=`<div class="rev-top">
     <div class="rev-top-t">Remessa de hoje</div>
-    <div class="rev-top-s">${revisao.length} comprovante${revisao.length===1?'':'s'} · <span style="color:var(--green)">${okN} pronto${okN===1?'':'s'}</span>${pend.length?` · <span style="color:var(--yellow)">${pend.length} para conferir</span>`:''}</div>
+    <div class="rev-top-s">${revisao.length} lançamento${revisao.length===1?'':'s'} · <span style="color:var(--green)">${okN} pronto${okN===1?'':'s'}</span>${pend.length?` · <span style="color:var(--yellow)">${pend.length} para conferir</span>`:''}</div>
   </div>`;
 
   // Uma unidade para a remessa toda: a IA quase nunca sabe de qual loja é o papel.
@@ -3686,7 +3974,7 @@ function renderRevisao(){
   if(semUnit){
     html+=`<div class="rev-bulk">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">${semUnit} sem unidade definida</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">O comprovante normalmente não diz de qual loja é. Escolha aqui e aplico em todos que estão sem.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">Nem o comprovante nem a fala costumam dizer de qual loja é. Escolha aqui e aplico em todos que estão sem.</div>
       <select id="rev-bulk-unit" class="rev-sel">${units.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select>
       <button class="btn-p btn-ghost" style="margin-top:8px" onclick="aplicarUnitEmTodos()">Aplicar a todos sem unidade</button>
     </div>`;
@@ -3701,6 +3989,7 @@ function renderRevisao(){
       ${pend.length?`Lançar ${okN} pronto${okN===1?'':'s'} (${pend.length} ficam pendentes)`:`✓ Lançar ${revisao.length} lançamento${revisao.length===1?'':'s'}`}
     </button>
     <button class="btn-p btn-ghost" onclick="pickFiles()">Adicionar mais comprovantes</button>
+    <button class="btn-p btn-ghost" onclick="openVoz()">Adicionar falando</button>
     <button class="btn-p btn-ghost" onclick="colarComprovante()">Colar comprovante copiado</button>
     <button class="btn-p btn-ghost" onclick="openExtrato()">Conferir extrato bancário</button>
     <button class="btn-p btn-del" onclick="descartarRevisao()">Descartar remessa</button>
@@ -3715,13 +4004,15 @@ function revRowHTML(it,i){
   const isIn=it.tipo==='in';
   const cor=isIn?'var(--green)':'var(--red)';
   const thumb=(it.img_key||it.img_b64)?imgTag(it,'rev-thumb')
-    :`<div class="rev-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted2)"><svg class="ic"><use href="#i-doc"/></svg></div>`;
+    :`<div class="rev-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted2)"><svg class="ic"><use href="#i-${it.origem==='voz'?'mic':'doc'}"/></svg></div>`;
   return `<div class="row" style="align-items:flex-start" onclick="openRevisaoItem(${i})">
     ${thumb}
     <div class="row-info">
       <div class="row-name">${esc(it.desc|| (cat?cat.label:'Sem descrição'))}</div>
       <div class="row-meta">${isIn?'Entrada':'Saída'}${cat?' · '+cat.label:''}${it.unit?' · '+getUnit(it.unit).name:''} · ${fmtDate(it.data)}</div>
       ${it.origem==='extrato'?`<div class="rev-src">do extrato</div>`:''}
+      ${it.origem==='voz'?`<div class="rev-src">do ditado</div>`:''}
+      ${it.origem==='voz'&&it.frase?`<div class="rev-duv" style="font-style:italic">“${esc(it.frase)}”</div>`:''}
       ${pend.length?`<div class="rev-badge warn"><svg class="ic ic-sm"><use href="#i-alert"/></svg>Falta: ${pend.join(', ')}</div>`:`<div class="rev-badge ok"><svg class="ic ic-sm"><use href="#i-check"/></svg>Pronto</div>`}
       ${(it.duvidas||[]).map(d=>`<div class="rev-duv">${esc(d)}</div>`).join('')}
     </div>
@@ -3767,8 +4058,11 @@ function openRevisaoItem(i){
   calcAtraso();
   const duv=(it.duvidas||[]).length
     ? `<div class="rev-duv-box">${it.duvidas.map(d=>`<div>${esc(d)}</div>`).join('')}</div>` : '';
+  // Sem papel para olhar, o que ele confere é a própria fala.
+  const falado=it.origem==='voz'&&it.frase
+    ? `<div class="note" style="margin-bottom:10px"><b>Você falou:</b> “${esc(it.frase)}”</div>` : '';
   const wrap=document.getElementById('mo-img-wrap');
-  wrap.innerHTML=imgTag(it,'rec-img')+duv;
+  wrap.innerHTML=falado+imgTag(it,'rec-img')+duv;
   hydrateImgs(wrap);
   document.getElementById('l-del-btn').style.display='block';
   document.getElementById('l-del-btn').textContent='Descartar este comprovante';
