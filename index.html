@@ -2774,7 +2774,22 @@ const LINHA_IGNORADA = [
   /^[-=_·•|\s]+$/,                  // linha de traços
   /(^|\s)totais?(\s|:|$)/i,         // rodapé de soma
   /^\d+\s+lan[çc]amentos/i,
+  // Título da planilha. Sem isto, "Contas fixas 2026" viraria uma despesa de
+  // R$ 2.026 e "sem os 6 excluídos", uma de R$ 6.
+  /^[^|;\t]*\b(lan[çc]amentos? fixos?|contas fixas|despesas fixas|lista|rela[çc][ãa]o|planilha|atualizad[oa])\b[^|;\t]*$/i,
 ];
+
+// Número solto numa linha sem colunas nem sempre é dinheiro: pode ser ano,
+// quantidade ou pedaço do título. Só aceito o que tem cara de valor.
+function pareceDinheiro(tok){
+  const t=tok.trim();
+  if(/r\$/i.test(t)) return true;              // "R$ 90"
+  if(/[.,]\d{2}$/.test(t)) return true;        // "199,90" · "7.500,00"
+  if(/\d\.\d{3}\b/.test(t)) return true;       // "7.500"
+  const so=t.replace(/\D/g,'');
+  if(/^(19|20)\d{2}$/.test(so)) return false;  // ano
+  return so.length>=3;                          // "800" sim, "6" e "81" não
+}
 
 function parseFixasTexto(txt){
   const itens=[];
@@ -2828,7 +2843,7 @@ function lerLinhaSolta(linha){
   // O valor é o número com cara de dinheiro que sobrou na linha. O "r$" precisa
   // vir com o cifrão, senão o "r" de "Contador" entraria no número.
   const tokens=[...t.matchAll(/(?:r\$\s*)?\d[\d.,]*/gi)].filter(m=>{
-    const v=parseValorBR(m[0]); return !isNaN(v)&&v>0;
+    const v=parseValorBR(m[0]); return !isNaN(v)&&v>0&&pareceDinheiro(m[0]);
   });
   if(!tokens.length) return null;
   const escolhido = tokens.find(m=>/[.,]\d{2}\b/.test(m[0])||/r\$/i.test(m[0])) || tokens[tokens.length-1];
