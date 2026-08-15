@@ -505,6 +505,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 <input type="file" id="file-in" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files);this.value=''"/>
 <input type="file" id="file-extrato" accept=".ofx,.csv,.txt,text/plain,text/csv,application/x-ofx" style="display:none" onchange="extratoDeArquivo(this.files);this.value=''"/>
 <input type="file" id="file-extrato-img" accept="image/*" multiple style="display:none" onchange="extratoDeFoto(this.files);this.value=''"/>
+<input type="file" id="file-backup" accept=".json,application/json" style="display:none" onchange="restaurarBackupArquivo(this.files);this.value=''"/>
 
 <!-- PROCESSING -->
 <div class="proc-ov hidden" id="proc-ov">
@@ -768,6 +769,44 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   </div>
 </div>
 
+<!-- BACKUP NA NUVEM -->
+<div class="mo" id="mo-backup">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">Ligar backup na nuvem</div>
+    <div class="mb">
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px">
+        Uma cópia dos seus dados fica guardada na sua conta do Supabase. Precisa de senha
+        justamente para que só você leia — inclusive a chave de IA, que fica lá dentro.
+      </div>
+      <div class="field"><label>Endereço do projeto</label>
+        <input type="url" id="sb-url" placeholder="https://xxxx.supabase.co" autocomplete="off"/></div>
+      <div class="field"><label>Chave pública (anon)</label>
+        <input type="text" id="sb-anon" placeholder="eyJhbGciOi..." autocomplete="off"/></div>
+      <div class="note" style="margin-bottom:14px">
+        As duas estão no Supabase em <b>Project Settings → API</b>. A chave <b>anon</b> é pública
+        de propósito, pode colar aqui sem medo. Nunca use a <b>service_role</b>.
+      </div>
+      <div class="field"><label>E-mail</label>
+        <input type="email" id="sb-email" placeholder="voce@email.com" autocomplete="username"/></div>
+      <div class="field"><label>Senha</label>
+        <input type="password" id="sb-senha" placeholder="a senha da conta" autocomplete="current-password"/></div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="ligarBackup()">Entrar e ligar</button>
+      <div id="sb-status" style="font-size:12px;margin-top:10px;line-height:1.55"></div>
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px">Antes: criar a tabela</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:10px">
+        Uma vez só, no Supabase em <b>SQL Editor</b>: cole o texto abaixo e rode. Ele cria a tabela
+        e tranca para que cada conta enxergue apenas os próprios dados.
+      </div>
+      <div class="field"><textarea id="sb-sql" readonly onclick="this.select()"
+        style="min-height:130px;font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace"></textarea></div>
+      <button class="btn-p btn-ghost" style="margin-top:8px" onclick="copiarSQL()">Copiar o SQL</button>
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-backup')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- AGENDA DE PAGAMENTOS -->
 <div class="mo" id="mo-agenda">
   <div class="ms">
@@ -905,6 +944,9 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
 const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1', SK_R = 'fc_revisao_v1';
 const SK_CT = 'fc_contas_v1', SK_AP = 'fc_apagar_v1';
+const SK_SB = 'fc_supabase_v1';   // url + anon key do projeto
+const SK_SESS = 'fc_sb_sessao_v1';// token de quem está logado
+const SK_SYNC = 'fc_sync_v1';     // quando foi o último envio bem-sucedido
 const SK_EX = 'fc_extrato_v1', SK_CHAT = 'fc_chat_v1', SK_ONB = 'fc_onboard_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
@@ -1000,6 +1042,12 @@ let contas   = JSON.parse(localStorage.getItem(SK_CT)||'[]');
 // com data, ainda não é saída de caixa — só vira lançamento quando ele paga.
 let apagar   = JSON.parse(localStorage.getItem(SK_AP)||'[]');
 let chatHist = JSON.parse(localStorage.getItem(SK_CHAT)||'[]');
+// Backup na nuvem — declarado aqui em cima porque o save() usa desde a partida.
+let sbCfg = JSON.parse(localStorage.getItem(SK_SB)||'null');
+let sbSess = JSON.parse(localStorage.getItem(SK_SESS)||'null');
+let sbUltimo = localStorage.getItem(SK_SYNC)||'';
+let sbOcupado=false, sbTimer=null, sbErro='';
+
 let jaConfigurou = localStorage.getItem(SK_ONB)==='1';
 
 let currentTab = 'home';
@@ -1025,6 +1073,7 @@ function save(){
     localStorage.setItem(SK_CT,JSON.stringify(contas));
     localStorage.setItem(SK_AP,JSON.stringify(apagar));
     localStorage.setItem(SK_CHAT,JSON.stringify(chatHist.slice(-40)));
+    agendarSync();
     return true;
   }catch(e){
     // Última tentativa: grava tudo sem as fotos, que é o que ocupa espaço.
@@ -2159,12 +2208,85 @@ function blocoContas(data){
 // ══════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════
+function quandoSync(){
+  if(!sbUltimo) return 'ainda não enviado';
+  const d=new Date(sbUltimo);
+  const min=Math.round((Date.now()-d.getTime())/60000);
+  if(min<1) return 'agora mesmo';
+  if(min<60) return `há ${min} min`;
+  if(min<1440) return `há ${Math.round(min/60)} h`;
+  return fmtDateFull(ymd(d));
+}
+
+function blocoBackupHTML(){
+  const ligado=sbLigado();
+  const n=tamanhoEstado(estadoParaNuvem());
+  return `
+  <div class="sh" style="margin-top:4px"><div class="st">Backup na nuvem</div></div>
+  <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px">
+    ${ligado?`
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+        <span style="width:9px;height:9px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+        <div style="font-size:13px;font-weight:600">Ligado</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:12px">
+        ${esc(sbSess.email||'')} · ${n} ${n===1?'registro':'registros'} · último envio ${quandoSync()}.
+        ${sbErro?`<br><span style="color:var(--red)">${esc(sbErro)}</span>`:''}
+      </div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="sincronizar(false)">Enviar agora</button>
+      <button class="btn-p btn-ghost" onclick="baixarDaNuvem()">Trazer da nuvem para este aparelho</button>
+      <button class="btn-p btn-ghost" onclick="baixarBackupArquivo()">Salvar cópia no aparelho</button>
+      <button class="btn-p btn-ghost" onclick="pedirArquivoBackup()">Restaurar de um arquivo</button>
+      <button class="btn-p btn-del" onclick="desligarBackup()">Desligar backup</button>
+    `:`
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:12px">
+        Hoje os ${n} ${n===1?'registro está':'registros estão'} só neste celular. Se o aparelho sumir
+        ou os dados do navegador forem limpos, some tudo. Ligue o backup e uma cópia fica guardada
+        na sua conta — e a chave de IA vem junto, sem precisar copiar e colar em cada aparelho.
+      </div>
+      <button class="btn-p btn-green" style="margin-top:0" onclick="openBackup()">Ligar backup</button>
+      <button class="btn-p btn-ghost" onclick="baixarBackupArquivo()">Salvar cópia no aparelho</button>
+      <button class="btn-p btn-ghost" onclick="pedirArquivoBackup()">Restaurar de um arquivo</button>
+    `}
+  </div>`;
+}
+
+// Cópia local: um arquivo que ele guarda onde quiser. Funciona sem nuvem e
+// sem conta nenhuma — é a rede de segurança mais simples que existe.
+function baixarBackupArquivo(){
+  const dados=JSON.stringify({app:'FluxoCaixa', em:new Date().toISOString(), ...estadoParaNuvem()},null,1);
+  const blob=new Blob([dados],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`fluxocaixa-${today()}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  showToast('ok','Cópia salva no aparelho');
+}
+
+function pedirArquivoBackup(){ document.getElementById('file-backup').click(); }
+
+async function restaurarBackupArquivo(files){
+  const f=files&&files[0]; if(!f) return;
+  try{
+    const d=JSON.parse(await f.text());
+    const n=tamanhoEstado(d), atual=tamanhoEstado(estadoParaNuvem());
+    if(!n){ showToast('erro','Esse arquivo não tem dados do FluxoCaixa'); return; }
+    if(!confirm(`Restaurar ${n} registro(s) do arquivo?\n\nO que está no aparelho agora (${atual}) será substituído.`)) return;
+    aplicarEstadoDaNuvem(d); save(); renderPage(currentTab);
+    showToast('ok',`${n} registro(s) restaurados`);
+    agendarSync();
+  }catch(e){ showToast('erro','Não consegui ler esse arquivo'); }
+}
+
 function renderConfig(){
   const apiKey=localStorage.getItem(SK_KEY)||'';
   let html=`
-  <div class="sh" style="margin-top:4px"><div class="st">Reconhecimento por IA</div></div>
+  ${blocoBackupHTML()}
+
+  <div class="sh"><div class="st">Reconhecimento por IA</div></div>
   <div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px">
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Chave de API da <b>OpenRouter</b> usada para ler os comprovantes por foto. Crie a sua em openrouter.ai/keys.</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Chave de API da <b>OpenRouter</b> usada para ler os comprovantes por foto. Crie a sua em openrouter.ai/keys.${sbLigado()?' Com o backup ligado, ela vem da nuvem sozinha em cada aparelho.':''}</div>
     <div class="field" style="margin-bottom:10px">
       <label>Chave de API (OpenRouter)</label>
       <input type="password" id="cfg-apikey" placeholder="sk-or-v1-..." value="${apiKey?'••••••••••••••••':''}" onfocus="if(this.value.startsWith('•'))this.value=''"/>
@@ -2310,6 +2432,7 @@ function saveApiKey(){
   const val=document.getElementById('cfg-apikey').value.trim();
   if(!val || val.startsWith('•')){ showToast('info','Nada alterado'); return; }
   localStorage.setItem(SK_KEY,val);
+  agendarSync();
   showToast('ok','Chave salva!');
   renderConfig();
 }
@@ -5166,6 +5289,296 @@ function closeMo(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.mo').forEach(el=>{
   el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('open'); });
 });
+
+// ══════════════════════════════════════════════════
+// BACKUP NA NUVEM (SUPABASE)
+// ══════════════════════════════════════════════════
+// Os dados vivem no celular. Se o aparelho sumir, some tudo — por isso a
+// cópia na nuvem. Falo direto com a API REST do Supabase: sem biblioteca de
+// fora, o app continua um arquivo só e continua abrindo sem internet.
+//
+// Regra que manda em tudo: NUNCA deixar a nuvem apagar o que está no celular.
+// Na dúvida, o aparelho vence e ele decide.
+const sbLigado = () => !!(sbCfg&&sbCfg.url&&sbCfg.anon&&sbSess&&sbSess.access_token);
+
+function sbSalvarCfg(){
+  localStorage.setItem(SK_SB,JSON.stringify(sbCfg||null));
+  localStorage.setItem(SK_SESS,JSON.stringify(sbSess||null));
+  localStorage.setItem(SK_SYNC,sbUltimo||'');
+}
+
+// Tudo o que vale a pena guardar. Fotos ficam de fora de propósito: são
+// pesadas, vivem no IndexedDB e transformariam cada envio em megabytes.
+function estadoParaNuvem(){
+  return {
+    versao:1,
+    lancamentos: lancamentos.map(l=>{const c={...l}; delete c.img_b64; delete c.img_mime; return c;}),
+    maquinas, units, socios, compromissos, fixas, contas, apagar,
+    revisao: revisao.map(r=>{const c={...r}; delete c.img_b64; delete c.img_mime; return c;}),
+    extratoVistos, jaConfigurou,
+  };
+}
+
+function aplicarEstadoDaNuvem(d){
+  if(!d||typeof d!=='object') return false;
+  if(Array.isArray(d.lancamentos)) lancamentos=d.lancamentos;
+  if(Array.isArray(d.maquinas)&&d.maquinas.length) maquinas=d.maquinas;
+  if(Array.isArray(d.units)&&d.units.length) units=d.units;
+  if(Array.isArray(d.socios)) socios=d.socios;
+  if(Array.isArray(d.compromissos)) compromissos=d.compromissos;
+  if(Array.isArray(d.fixas)) fixas=d.fixas;
+  if(Array.isArray(d.contas)) contas=d.contas;
+  if(Array.isArray(d.apagar)) apagar=d.apagar;
+  if(Array.isArray(d.revisao)) revisao=d.revisao;
+  if(d.extratoVistos&&typeof d.extratoVistos==='object') extratoVistos=d.extratoVistos;
+  if(d.jaConfigurou!==undefined){ jaConfigurou=!!d.jaConfigurou;
+    localStorage.setItem(SK_ONB,jaConfigurou?'1':''); }
+  return true;
+}
+
+// Quantidade de coisa guardada, para comparar celular x nuvem sem adivinhar.
+function tamanhoEstado(d){
+  if(!d) return 0;
+  return ['lancamentos','fixas','apagar','compromissos','revisao']
+    .reduce((s,k)=>s+((d[k]||[]).length),0);
+}
+
+async function sbFetch(caminho, opcoes, semToken){
+  if(!sbCfg||!sbCfg.url||!sbCfg.anon) throw new Error('Configure o Supabase primeiro');
+  const base=sbCfg.url.replace(/\/+$/,'');
+  const h=Object.assign({'apikey':sbCfg.anon,'Content-Type':'application/json'},(opcoes&&opcoes.headers)||{});
+  if(!semToken&&sbSess&&sbSess.access_token) h['Authorization']='Bearer '+sbSess.access_token;
+  const r=await fetch(base+caminho,Object.assign({},opcoes,{headers:h}));
+  // Token vence a cada hora: renova e repete, sem pedir a senha de novo.
+  if(r.status===401&&!semToken&&sbSess&&sbSess.refresh_token){
+    if(await sbRenovar()) return sbFetch(caminho,opcoes,semToken);
+  }
+  return r;
+}
+
+async function sbRenovar(){
+  try{
+    const r=await fetch(sbCfg.url.replace(/\/+$/,'')+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{'apikey':sbCfg.anon,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:sbSess.refresh_token})});
+    if(!r.ok) return false;
+    const d=await r.json();
+    if(!d.access_token) return false;
+    sbSess={access_token:d.access_token, refresh_token:d.refresh_token||sbSess.refresh_token,
+            email:sbSess.email, user_id:(d.user&&d.user.id)||sbSess.user_id};
+    sbSalvarCfg();
+    return true;
+  }catch(e){ return false; }
+}
+
+async function sbEntrar(email, senha){
+  const r=await fetch(sbCfg.url.replace(/\/+$/,'')+'/auth/v1/token?grant_type=password',{
+    method:'POST', headers:{'apikey':sbCfg.anon,'Content-Type':'application/json'},
+    body:JSON.stringify({email, password:senha})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.access_token){
+    throw new Error(d.error_description||d.msg||d.message||'E-mail ou senha não conferem');
+  }
+  sbSess={access_token:d.access_token, refresh_token:d.refresh_token,
+          email:(d.user&&d.user.email)||email, user_id:d.user&&d.user.id};
+  sbSalvarCfg();
+  return sbSess;
+}
+
+async function sbBaixar(){
+  const r=await sbFetch('/rest/v1/fc_estado?select=dados,chave_ia,atualizado_em&limit=1',{method:'GET'});
+  if(r.status===404||r.status===400){
+    throw new Error('Tabela fc_estado não existe. Rode o SQL de instalação no Supabase.');
+  }
+  if(!r.ok) throw new Error('Não consegui ler da nuvem ('+r.status+')');
+  const linhas=await r.json();
+  return Array.isArray(linhas)&&linhas.length?linhas[0]:null;
+}
+
+async function sbEnviar(){
+  const corpo={user_id:sbSess.user_id, dados:estadoParaNuvem(), atualizado_em:new Date().toISOString()};
+  const chave=localStorage.getItem(SK_KEY);
+  if(chave) corpo.chave_ia=chave;
+  const r=await sbFetch('/rest/v1/fc_estado',{method:'POST',
+    headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(corpo)});
+  if(!r.ok){
+    const t=await r.text().catch(()=>'');
+    throw new Error('Não consegui gravar na nuvem ('+r.status+') '+t.slice(0,120));
+  }
+  sbUltimo=new Date().toISOString();
+  sbSalvarCfg();
+}
+
+// Sync automático: junta as alterações e envia uma vez só, para não disparar
+// uma gravação a cada tecla.
+function agendarSync(){
+  if(!sbLigado()) return;
+  clearTimeout(sbTimer);
+  sbTimer=setTimeout(()=>sincronizar(true),2500);
+}
+
+async function sincronizar(silencioso){
+  if(!sbLigado()||sbOcupado) return false;
+  sbOcupado=true; sbErro='';
+  if(!silencioso) atualizarStatusSync('Enviando…');
+  try{
+    await sbEnviar();
+    if(!silencioso){ showToast('ok','Backup atualizado'); }
+    atualizarStatusSync();
+    return true;
+  }catch(e){
+    sbErro=e.message;
+    if(!silencioso) showToast('erro',e.message);
+    atualizarStatusSync();
+    return false;
+  }finally{ sbOcupado=false; }
+}
+
+// O momento perigoso: a primeira ligação. Se a nuvem estiver vazia, sobe o
+// que está no celular. Se as duas tiverem dados, ele escolhe — nada é
+// sobrescrito sem ele mandar.
+async function primeiroSync(){
+  const remoto=await sbBaixar();
+  const nLocal=tamanhoEstado(estadoParaNuvem());
+  const nRemoto=remoto?tamanhoEstado(remoto.dados):0;
+
+  if(remoto&&remoto.chave_ia&&!localStorage.getItem(SK_KEY)){
+    localStorage.setItem(SK_KEY,remoto.chave_ia);
+  }
+
+  if(!remoto||!nRemoto){
+    await sbEnviar();
+    return {acao:'enviou', nLocal, nRemoto};
+  }
+  if(!nLocal){
+    aplicarEstadoDaNuvem(remoto.dados); save();
+    return {acao:'baixou', nLocal, nRemoto};
+  }
+  return {acao:'conflito', nLocal, nRemoto, remoto};
+}
+
+// A tabela e as travas. Uma linha por conta, e RLS para que uma conta não
+// alcance a linha da outra — é isso que deixa a chave de IA segura lá dentro.
+const SQL_INSTALACAO = `create table if not exists public.fc_estado (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  dados jsonb not null default '{}'::jsonb,
+  chave_ia text,
+  atualizado_em timestamptz not null default now()
+);
+
+alter table public.fc_estado enable row level security;
+
+drop policy if exists "dono le" on public.fc_estado;
+create policy "dono le" on public.fc_estado
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "dono grava" on public.fc_estado;
+create policy "dono grava" on public.fc_estado
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "dono atualiza" on public.fc_estado;
+create policy "dono atualiza" on public.fc_estado
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);`;
+
+function openBackup(){
+  document.getElementById('sb-url').value=(sbCfg&&sbCfg.url)||'';
+  document.getElementById('sb-anon').value=(sbCfg&&sbCfg.anon)||'';
+  document.getElementById('sb-email').value=(sbSess&&sbSess.email)||'';
+  document.getElementById('sb-senha').value='';
+  document.getElementById('sb-sql').value=SQL_INSTALACAO;
+  document.getElementById('sb-status').innerHTML='';
+  openMo('mo-backup');
+}
+
+function copiarSQL(){
+  const ta=document.getElementById('sb-sql');
+  ta.select(); ta.setSelectionRange(0,99999);
+  navigator.clipboard?.writeText(SQL_INSTALACAO).then(
+    ()=>showToast('ok','SQL copiado'),
+    ()=>{ try{ document.execCommand('copy'); showToast('ok','SQL copiado'); }
+          catch(e){ showToast('warn','Selecione e copie o texto'); } });
+}
+
+const statusBackup = (msg,cor) => {
+  document.getElementById('sb-status').innerHTML=`<span style="color:var(--${cor||'muted'})">${msg}</span>`;
+};
+
+async function ligarBackup(){
+  const url=document.getElementById('sb-url').value.trim().replace(/\/+$/,'');
+  const anon=document.getElementById('sb-anon').value.trim();
+  const email=document.getElementById('sb-email').value.trim();
+  const senha=document.getElementById('sb-senha').value;
+  if(!/^https:\/\/.+/.test(url)){ statusBackup('O endereço começa com https:// e termina em .supabase.co','red'); return; }
+  if(anon.length<20){ statusBackup('Cole a chave anon inteira','red'); return; }
+  if(!email||!senha){ statusBackup('Preencha e-mail e senha','red'); return; }
+  if(/service_role/.test(anon)){ statusBackup('Essa é a chave service_role. Use a anon.','red'); return; }
+
+  statusBackup('Entrando…');
+  const cfgAntes=sbCfg, sessAntes=sbSess;
+  sbCfg={url,anon};
+  try{
+    await sbEntrar(email,senha);
+    statusBackup('Conferindo o que já existe na nuvem…');
+    const r=await primeiroSync();
+    if(r.acao==='enviou'){
+      statusBackup(`Pronto. ${r.nLocal} registro(s) deste celular foram guardados.`,'green');
+      fecharBackupOk('Backup ligado');
+    } else if(r.acao==='baixou'){
+      statusBackup(`Pronto. ${r.nRemoto} registro(s) vieram da nuvem.`,'green');
+      fecharBackupOk('Dados restaurados');
+    } else {
+      // Os dois lados têm coisa. Não escolho por ele: perder dado aqui é o
+      // pior que pode acontecer.
+      const q=`Este celular tem ${r.nLocal} registro(s) e a nuvem tem ${r.nRemoto}.\n\n`
+        +`OK = mandar o deste celular para a nuvem (a nuvem é substituída).\n`
+        +`Cancelar = trazer o da nuvem para cá (este celular é substituído).`;
+      if(confirm(q)){ await sbEnviar(); fecharBackupOk('Enviado para a nuvem'); }
+      else {
+        baixarBackupArquivo();   // guarda o do celular antes de trocar
+        aplicarEstadoDaNuvem(r.remoto.dados); save();
+        fecharBackupOk('Trazido da nuvem');
+      }
+    }
+  }catch(e){
+    sbCfg=cfgAntes; sbSess=sessAntes; sbSalvarCfg();
+    statusBackup(esc(e.message),'red');
+  }
+}
+
+function fecharBackupOk(msg){
+  sbSalvarCfg();
+  closeMo('mo-backup');
+  renderPage(currentTab);
+  showToast('ok',msg);
+}
+
+async function baixarDaNuvem(){
+  if(!sbLigado()) return;
+  try{
+    const r=await sbBaixar();
+    const n=r?tamanhoEstado(r.dados):0;
+    if(!n){ showToast('warn','A nuvem ainda não tem dados'); return; }
+    const atual=tamanhoEstado(estadoParaNuvem());
+    if(!confirm(`Trazer ${n} registro(s) da nuvem?\n\nO que está neste celular agora (${atual}) será substituído. Vou salvar uma cópia antes.`)) return;
+    baixarBackupArquivo();
+    if(r.chave_ia) localStorage.setItem(SK_KEY,r.chave_ia);
+    aplicarEstadoDaNuvem(r.dados); save();
+    renderPage(currentTab);
+    showToast('ok',`${n} registro(s) trazidos`);
+  }catch(e){ showToast('erro',e.message); }
+}
+
+function desligarBackup(){
+  if(!confirm('Desligar o backup?\n\nOs dados continuam neste celular e a cópia continua na nuvem, mas param de ser atualizados.')) return;
+  sbSess=null; sbSalvarCfg();
+  renderPage(currentTab);
+  showToast('mute','Backup desligado');
+}
+
+function atualizarStatusSync(){
+  if(currentTab==='config') renderConfig();
+}
 
 // ══════════════════════════════════════════════════
 // TOAST
