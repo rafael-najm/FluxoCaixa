@@ -155,6 +155,25 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 .hold-ov.cancelando .hold-card{background:var(--red-d);}
 .hold-ov.cancelando .hold-lbl,.hold-ov.cancelando .hold-dica{color:var(--red);}
 
+/* ── AGENDA DE PAGAMENTOS ── */
+.ag-grupo{margin-bottom:18px;}
+.ag-cab{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
+.ag-tit{font-size:13px;font-weight:600;letter-spacing:-.005em;}
+.ag-tot{margin-left:auto;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text2);}
+.ag-grupo.urgente .ag-tit,.ag-grupo.urgente .ag-tot{color:var(--red);}
+.ag-row{display:flex;align-items:flex-start;gap:11px;padding:13px 14px;border-bottom:1px solid var(--border);}
+.ag-row:last-child{border-bottom:none;}
+.ag-info{flex:1;min-width:0;}
+.ag-nome{font-size:14px;font-weight:500;letter-spacing:-.005em;}
+.ag-meta{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ag-dir{text-align:right;flex-shrink:0;}
+.ag-val{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;}
+.ag-pagar{font-size:11px;color:var(--accent);font-weight:600;cursor:pointer;margin-top:4px;}
+.ag-tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  padding:2px 6px;border-radius:4px;background:var(--s2);color:var(--muted);margin-top:5px;}
+.ag-tag.aprox{background:var(--yellow-d);color:var(--yellow);}
+.ag-tag.atraso{background:var(--red-d);color:var(--red);}
+
 /* ── CONFIRMAR O QUE FOI FALADO ── */
 .cf-item{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;
   background:var(--s1);}
@@ -749,6 +768,51 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
   </div>
 </div>
 
+<!-- AGENDA DE PAGAMENTOS -->
+<div class="mo" id="mo-agenda">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">Agenda de pagamentos</div>
+    <div class="mb">
+      <div id="ag-conteudo"></div>
+      <button class="btn-p btn-green" style="margin-top:4px" onclick="openAddPagar()">+ Nova conta a pagar</button>
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-agenda')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTA A PAGAR -->
+<div class="mo" id="mo-apagar">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt" id="ap-titulo">Nova conta a pagar</div>
+    <div class="mb">
+      <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px">
+        Boleto que chegou, mercadoria recebida, embalagem. Ainda não saiu do caixa —
+        entra na agenda e vira lançamento no dia em que você pagar.
+      </div>
+      <div class="field"><label>Do que se trata</label>
+        <input type="text" id="ap-desc" placeholder="Ex: Boleto tecido malha"/></div>
+      <div class="field"><label>Fornecedor</label>
+        <input type="text" id="ap-forn" placeholder="Ex: Tecidos São Paulo"/></div>
+      <div class="two-col">
+        <div class="field"><label>Valor (R$)</label>
+          <input type="number" id="ap-valor" inputmode="decimal" step=".01" placeholder="0,00"/></div>
+        <div class="field"><label>Vence em</label><input type="date" id="ap-venc"/></div>
+      </div>
+      <div class="field"><label>Categoria</label><select id="ap-cat"></select></div>
+      <div class="field"><label>Unidade</label><select id="ap-unit"></select></div>
+      <div class="field"><label>Pagar por qual conta (opcional)</label>
+        <input type="text" id="ap-conta" list="dl-contas" placeholder="Ex: Bradesco"/></div>
+      <div class="field"><label>Observação (opcional)</label>
+        <textarea id="ap-obs" placeholder="Nº do boleto, o que veio..."></textarea></div>
+      <button class="btn-p btn-green" onclick="salvarPagar()">Salvar na agenda</button>
+      <button class="btn-p btn-ghost" onclick="closeMo('mo-apagar')">Cancelar</button>
+      <button class="btn-p btn-del" id="ap-del" onclick="removerPagar()" style="display:none">Excluir da agenda</button>
+    </div>
+  </div>
+</div>
+
 <!-- SEGURANDO O MICROFONE -->
 <div class="hold-ov hidden" id="hold-ov">
   <div class="hold-card">
@@ -840,7 +904,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
 // ══════════════════════════════════════════════════
 const SK_L = 'fc_lanc_v3', SK_M = 'fc_maq_v3', SK_U = 'fc_units_v1', SK_F = 'fc_filter_v1', SK_KEY = 'fc_orkey_v1';
 const SK_S = 'fc_socios_v1', SK_C = 'fc_comp_v1', SK_FX = 'fc_fixas_v1', SK_R = 'fc_revisao_v1';
-const SK_CT = 'fc_contas_v1';
+const SK_CT = 'fc_contas_v1', SK_AP = 'fc_apagar_v1';
 const SK_EX = 'fc_extrato_v1', SK_CHAT = 'fc_chat_v1', SK_ONB = 'fc_onboard_v1';
 const OR_MODEL = 'anthropic/claude-sonnet-4';
 
@@ -932,6 +996,9 @@ let extratoVistos = JSON.parse(localStorage.getItem(SK_EX)||'{}');
 // De onde o dinheiro saiu ou entrou ("Bradesco", "Itaú", "dinheiro"). A lista
 // se monta sozinha conforme ele fala ou digita, para não virar mais um cadastro.
 let contas   = JSON.parse(localStorage.getItem(SK_CT)||'[]');
+// Contas a pagar: boleto que chegou, mercadoria recebida, embalagem. É dívida
+// com data, ainda não é saída de caixa — só vira lançamento quando ele paga.
+let apagar   = JSON.parse(localStorage.getItem(SK_AP)||'[]');
 let chatHist = JSON.parse(localStorage.getItem(SK_CHAT)||'[]');
 let jaConfigurou = localStorage.getItem(SK_ONB)==='1';
 
@@ -956,6 +1023,7 @@ function save(){
     localStorage.setItem(SK_R,JSON.stringify(revisao));
     localStorage.setItem(SK_EX,JSON.stringify(extratoVistos));
     localStorage.setItem(SK_CT,JSON.stringify(contas));
+    localStorage.setItem(SK_AP,JSON.stringify(apagar));
     localStorage.setItem(SK_CHAT,JSON.stringify(chatHist.slice(-40)));
     return true;
   }catch(e){
@@ -1147,6 +1215,79 @@ function fixaPagamentos(f, mes){
   return lancamentos.filter(l=>l.tipo==='out'&&mesDe(l.data)===mes&&!l.fixa_id&&l.cat===f.cat&&l.unit===f.unit);
 }
 function fixaPago(f, mes){ return fixaPagamentos(f,mes).reduce((s,l)=>s+(l.valor||0),0); }
+
+// ══════════════════════════════════════════════════
+// AGENDA DE PAGAMENTOS
+// ══════════════════════════════════════════════════
+// Junta duas coisas que ele acompanha junto: os boletos que chegaram (valor
+// certo, vencimento certo) e as contas fixas do mês que ainda não foram pagas
+// (valor aproximado, porque luz e água variam).
+function getPagar(id){ return apagar.find(a=>a.id===id); }
+const apagarAbertas = () => apagar.filter(a=>!a.pago);
+
+function diasAte(venc){
+  if(!ehData(venc)) return 9999;
+  const [y,m,d]=venc.split('-').map(Number);
+  const alvo=new Date(y,m-1,d), hoje=new Date();
+  hoje.setHours(0,0,0,0); alvo.setHours(0,0,0,0);
+  return Math.round((alvo-hoje)/86400000);
+}
+
+// Fatias do jeito que ele perguntou: o que é hoje, amanhã, esta semana, a
+// semana que vem.
+function faixaVenc(venc){
+  const d=diasAte(venc);
+  if(d<0)  return {id:'vencidas', ordem:0, titulo:'Vencidas'};
+  if(d===0)return {id:'hoje',     ordem:1, titulo:'Hoje'};
+  if(d===1)return {id:'amanha',   ordem:2, titulo:'Amanhã'};
+  if(d<=7) return {id:'semana',   ordem:3, titulo:'Nos próximos 7 dias'};
+  if(d<=14)return {id:'proxima',  ordem:4, titulo:'Semana que vem'};
+  if(d<=45)return {id:'depois',   ordem:5, titulo:'Mais para frente'};
+  return null;   // muito longe: não polui a agenda
+}
+
+// Uma fixa entra na agenda enquanto não houver pagamento dela no mês. Só o mês
+// corrente e só daqui para a frente: se ela já venceu, saber se foi paga depende
+// de um palpite (o pagamento pode estar lançado sem vínculo), e marcar "atrasada"
+// por engano é pior do que não marcar. Boleto cadastrado, esse sim, cobra atraso.
+function fixasEmAberto(){
+  const hoje=today();
+  const mes=mesAtual();
+  const itens=[];
+  fixas.forEach(f=>{
+    if(!f.dia) return;
+    if(fixaPagamentos(f,mes).length) return;               // já pagou este mês
+    const venc=vencDaFixa(f,hoje);
+    if(!venc || venc<hoje) return;
+    itens.push({id:'fx:'+f.id+':'+mes, fixa_id:f.id, desc:f.desc, forn:'',
+      valor:f.valor, venc, cat:f.cat, unit:f.unit, conta:'', aproximado:true, tipo:'fixa'});
+  });
+  return itens;
+}
+
+function agendaItens(){
+  const boletos=apagarAbertas().map(a=>({...a, aproximado:false, tipo:'boleto'}));
+  const todos=[...boletos, ...fixasEmAberto()]
+    .filter(i=>filter.unit==='all'||i.unit===filter.unit)
+    .filter(i=>faixaVenc(i.venc));
+  todos.sort((a,b)=>(a.venc||'').localeCompare(b.venc||''));
+  return todos;
+}
+
+function agendaAgrupada(){
+  const grupos={};
+  agendaItens().forEach(i=>{
+    const f=faixaVenc(i.venc);
+    (grupos[f.id]=grupos[f.id]||{...f, itens:[], total:0}).itens.push(i);
+    grupos[f.id].total+=(i.valor||0);
+  });
+  return Object.values(grupos).sort((a,b)=>a.ordem-b.ordem);
+}
+
+// O que ele precisa ver ao abrir o app: atrasado e o de hoje.
+function agendaUrgente(){
+  return agendaItens().filter(i=>diasAte(i.venc)<=0);
+}
 
 // ── TAXAS AINDA NÃO CONFERIDAS ──
 // Enquanto ele não confirmar a taxa de uma maquininha, todo número derivado dela
@@ -1383,6 +1524,40 @@ function atualizarBadge(){
 // ══════════════════════════════════════════════════
 // HOME
 // ══════════════════════════════════════════════════
+// A primeira pergunta dele ao abrir o app é "o que eu tenho que pagar hoje?".
+// Então isso fica no Início, antes de qualquer relatório.
+function blocoAgendaHome(){
+  const itens=agendaItens();
+  if(!itens.length) return '';
+  const urgentes=itens.filter(i=>diasAte(i.venc)<=0);
+  const proximos=itens.filter(i=>diasAte(i.venc)>0).slice(0,3);
+  const mostrar=[...urgentes.slice(0,4), ...proximos].slice(0,5);
+  const totalUrg=urgentes.reduce((s,i)=>s+(i.valor||0),0);
+  const atrasadas=urgentes.filter(i=>diasAte(i.venc)<0).length;
+  return `
+  <div class="sh"><div class="st">A pagar</div><div class="sa" onclick="openAgenda()">Ver agenda →</div></div>
+  ${urgentes.length?`<div class="note" style="border-left:2px solid var(--red);margin-bottom:10px">
+     <b>${fmt(totalUrg)}</b> ${urgentes.length===1?'vence':'vencem'} hoje ou já
+     ${urgentes.length===1?'venceu':'venceram'}${atrasadas?` · ${atrasadas} em atraso`:''}.
+   </div>`:''}
+  <div class="lst">${mostrar.map(i=>{
+    const d=diasAte(i.venc);
+    const quando=d<0?`${-d} dia${d===-1?'':'s'} em atraso`:d===0?'vence hoje':d===1?'vence amanhã':`vence em ${d} dias`;
+    return `<div class="row" onclick="openAgenda()">
+      <div class="row-ico"><span class="sw" style="background:${getCat(i.cat).cor}"></span></div>
+      <div class="row-info">
+        <div class="row-name">${esc(i.desc||getCat(i.cat).label)}</div>
+        <div class="row-meta">${fmtDate(i.venc)} · ${esc(getUnit(i.unit).name)}${i.aproximado?' · aproximado':''}</div>
+      </div>
+      <div class="row-right">
+        <div class="row-val" style="color:var(--red)">${fmt(i.valor)}</div>
+        <div class="row-sub" style="color:${d<=0?'var(--red)':'var(--muted)'}">${quando}</div>
+      </div>
+    </div>`;}).join('')}</div>
+  ${itens.length>mostrar.length?`<div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">
+     <span style="color:var(--accent);cursor:pointer" onclick="openAgenda()">e mais ${itens.length-mostrar.length} na agenda</span></div>`:''}`;
+}
+
 function renderHome(){
   const data = filterLanc(lancamentos);
   const t0 = today();
@@ -1438,7 +1613,8 @@ function renderHome(){
       <div class="hg-item"><div class="hg-lbl">Lançamentos</div><div class="hg-val">${data.length}</div></div>
     </div>
   </div>
-  ${avisoTaxasHTML(maquinasPendentesEmUso(data),'o que está em taxas e o que aparece como "na conta" ainda são estimativas')}`;
+  ${avisoTaxasHTML(maquinasPendentesEmUso(data),'o que está em taxas e o que aparece como "na conta" ainda são estimativas')}
+  ${blocoAgendaHome()}`;
 
   if(upcoming.length){
     html+=`<div class="sh"><div class="st">A receber</div><div class="sa" onclick="setTab('lancamentos')">Ver tudo →</div></div><div class="lst">`;
@@ -2308,7 +2484,7 @@ function calcLancPreview(){
 }
 
 function openLanc(tipo){
-  editingLancId=null; revisaoIdx=null;
+  editingLancId=null; revisaoIdx=null; pagandoAgendaId=null;
   document.getElementById('l-save-btn').textContent='Salvar';
   document.getElementById('l-del-btn').textContent='Excluir lançamento';
   document.getElementById('mo-lanc-title').textContent=tipo==='in'?'Nova Entrada':'Nova Saída';
@@ -2331,6 +2507,7 @@ function openLanc(tipo){
 }
 
 function openEditLanc(id){
+  pagandoAgendaId=null;
   const l=lancamentos.find(x=>x.id===id); if(!l) return;
   editingLancId=id; revisaoIdx=null;
   document.getElementById('l-save-btn').textContent='Salvar';
@@ -2415,7 +2592,10 @@ function saveLanc(){
     showToast('ok','Lançamento atualizado');
   } else {
     lancamentos.unshift(entry);
-    showToast('ok',`${fmt(val)} registrado!`);
+    // Se veio da agenda, dá baixa: senão continuaria cobrando um boleto já pago.
+    const daAgenda=!!pagandoAgendaId;
+    baixarAgenda();
+    showToast('ok',daAgenda?`${fmt(val)} pago · baixado da agenda`:`${fmt(val)} registrado!`);
   }
   save(); closeMo('mo-lanc'); renderPage(currentTab);
 }
@@ -2664,6 +2844,10 @@ REGRAS
 - Valores por extenso viram número: "mil e duzentos"=1200, "trezentos e cinquenta"=350, "dois mil e quinhentos"=2500, "quinhentos e vinte reais e trinta centavos"=520.30. "mil e duzentos e cinquenta" = 1250.
 - Datas faladas viram YYYY-MM-DD: "hoje"=${hoje}, "ontem", "anteontem", "segunda passada", "dia 5". Se ele falar só o dia e esse dia ainda não chegou neste mês, é do mês passado. Sem data falada, use ${hoje}.
 - "paguei", "mandei", "comprei", "tirei", "dei" → tipo "out". "recebi", "entrou", "vendi", "caiu" → tipo "in".
+- DINHEIRO QUE JÁ SAIU x CONTA QUE AINDA VAI VENCER — não confunda:
+  · "paguei", "mandei o pix", "quitei" → já saiu: agendar=false.
+  · "chegou um boleto", "tenho que pagar", "vence dia X", "recebi a mercadoria para pagar em", "fatura para o dia" → ainda não saiu: agendar=true, e a data do vencimento vai em "data_venc".
+  Em agendar=true, "data_venc" é obrigatório: se ele não disser quando vence, devolva data_venc=null e escreva isso em "duvidas".
 - Se ele se corrigir ("não, foram trezentos"), vale a última versão. Junte o que for claramente o mesmo pagamento.
 - Se ele disser um total e as parcelas ("mil, paguei trezentos"), devolva valor=300 e valor_total=1000.
 - Só preencha "unit" se ele disser a loja. Se ele disser um nome de loja que NÃO está na lista acima, devolva unit=null e o nome falado em "unit_falada" — não force numa loja parecida.
@@ -2675,7 +2859,10 @@ REGRAS
 - Se a fala não tiver nenhum pagamento, devolva {"lancamentos":[]}.
 
 Retorne APENAS JSON, sem texto em volta:
-{"lancamentos":[{"tipo":"in"|"out","valor":número ou null,"cat":"id_categoria ou null","desc":"descrição curta","forn":"quem recebeu ou null","conta":"de onde saiu o dinheiro ou null","data":"YYYY-MM-DD","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","unit_falada":"loja que ele falou e não existe, ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":null,"comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","frase":"trecho da fala","duvidas":["o que ficou incerto"]}]}
+{"lancamentos":[{"tipo":"in"|"out","agendar":true|false,"valor":número ou null,"cat":"id_categoria ou null","desc":"descrição curta","forn":"quem recebeu ou null","conta":"de onde saiu o dinheiro ou null","data":"YYYY-MM-DD","data_venc":"YYYY-MM-DD ou null","unit":"id_unidade ou null","unit_falada":"loja que ele falou e não existe, ou null","tipo_pag":"debito"|"credito_1x"|"credito_2_6x"|"credito_7x"|"pix"|null,"maquina_id":null,"comp_id":"id ou null","valor_total":número ou null,"fixa_id":"id ou null","frase":"trecho da fala","duvidas":["o que ficou incerto"]}]}
+
+Exemplo de conta a pagar: "chegou o boleto do tecido da Tecidos São Paulo, mil e duzentos, vence dia 20" →
+{"tipo":"out","agendar":true,"valor":1200,"cat":"tecido","desc":"Boleto tecido","forn":"Tecidos São Paulo","conta":null,"data":"${hoje}","data_venc":"${hoje.slice(0,7)}-20","unit":null,"unit_falada":null,"tipo_pag":null,"maquina_id":null,"comp_id":null,"valor_total":null,"fixa_id":null,"frase":"boleto do tecido mil e duzentos vence dia 20","duvidas":[]}
 
 Exemplo: "pagamento feito dia 10 de agosto, vale-transporte funcionários de Copacabana, oitocentos reais, pago pela conta do Bradesco" com Copacabana fora da lista de lojas →
 {"tipo":"out","valor":800,"cat":"funcionarios","desc":"Vale-transporte funcionários","forn":null,"conta":"Bradesco","data":"${hoje.slice(0,4)}-08-10","data_venc":null,"unit":null,"unit_falada":"Copacabana","tipo_pag":null,"maquina_id":null,"comp_id":null,"valor_total":null,"fixa_id":null,"frase":"vale-transporte funcionários de Copacabana oitocentos reais","duvidas":["Copacabana não é uma das lojas cadastradas"]}`;
@@ -2751,6 +2938,8 @@ async function lerFalaEConfirmar(texto, avisar){
     vozPendente=lista.map(res=>{
       const it=montarItemRevisao(res,null,'Ditado');
       it.origem='voz'; it.frase=res.frase||'';
+      // Boleto que chegou não é saída de caixa: vai para a agenda.
+      it.agendar = res.agendar===true && it.tipo==='out';
       return it;
     });
     mostrarConfirmacaoVoz();
@@ -2763,6 +2952,7 @@ async function lerFalaEConfirmar(texto, avisar){
 function mostrarConfirmacaoVoz(){
   const n=vozPendente.length;
   const faltando=vozPendente.filter(it=>!itemCompleto(it)).length;
+  const soAgenda=vozPendente.every(it=>it.agendar);
   document.getElementById('cf-titulo').textContent =
     n===1 ? 'Confere aí' : `Confere aí (${n})`;
   document.getElementById('cf-lista').innerHTML=vozPendente.map(it=>{
@@ -2775,7 +2965,8 @@ function mostrarConfirmacaoVoz(){
           ${it.valor?(it.tipo==='in'?'+':'−')+fmt(it.valor):'sem valor'}</div>
       </div>
       <div class="cf-linha">
-        <span class="cf-chip">${it.tipo==='in'?'Entrada':'Saída'}</span>
+        <span class="cf-chip">${it.agendar?'A pagar':(it.tipo==='in'?'Entrada':'Saída')}</span>
+        ${it.agendar&&ehData(it.data_venc)?`<span class="cf-chip">vence ${fmtDateFull(it.data_venc)}</span>`:''}
         ${cat?`<span class="cf-chip"><span class="sw" style="background:${cat.cor}"></span>${esc(cat.label)}</span>`:''}
         ${it.unit?`<span class="cf-chip">${esc(getUnit(it.unit).name)}</span>`:''}
         <span class="cf-chip">${fmtDateFull(it.data)}</span>
@@ -2790,10 +2981,11 @@ function mostrarConfirmacaoVoz(){
   // Sem tudo preenchido não dá para lançar: o botão leva para completar.
   const btn=document.getElementById('cf-ok');
   const prontos=n-faltando;
+  const verbo=soAgenda?'Agendar':'Lançar';
   if(prontos){
     btn.style.display='block';
-    btn.textContent = faltando ? `Lançar ${prontos} e conferir o resto`
-                     : (n===1?'Lançar':`Lançar ${n}`);
+    btn.textContent = faltando ? `${verbo} ${prontos} e conferir o resto`
+                     : (n===1?verbo:`${verbo} ${n}`);
   } else {
     btn.style.display='none';
   }
@@ -2802,19 +2994,27 @@ function mostrarConfirmacaoVoz(){
 }
 
 function confirmarVoz(){
-  let lancados=0, pendentes=0;
+  let lancados=0, agendados=0, pendentes=0;
   vozPendente.forEach(it=>{
-    if(itemCompleto(it)){
-      const novo=lancarItem(it);
-      vozLancados.unshift({id:novo.id,desc:novo.desc,valor:novo.valor,tipo:novo.tipo,
-        cat:novo.cat,unit:novo.unit,conta:novo.conta,frase:it.frase});
-      lancados++;
-    }else{ revisao.push(it); pendentes++; }
+    if(!itemCompleto(it)){ revisao.push(it); pendentes++; return; }
+    if(it.agendar){
+      apagar.push({id:'ap'+Date.now()+Math.floor(Math.random()*1000),
+        desc:it.desc||getCat(it.cat).label, forn:it.forn||'', valor:it.valor,
+        venc:it.data_venc, cat:it.cat, unit:it.unit,
+        conta:registrarConta(it.conta), obs:'', criado:today(), pago:false, origem:'voz'});
+      agendados++;
+      return;
+    }
+    const novo=lancarItem(it);
+    vozLancados.unshift({id:novo.id,desc:novo.desc,valor:novo.valor,tipo:novo.tipo,
+      cat:novo.cat,unit:novo.unit,conta:novo.conta,frase:it.frase});
+    lancados++;
   });
   vozPendente=[];
   save(); closeMo('mo-confirma'); limparVoz();
   renderPage(currentTab);
   if(lancados) showToast('ok',`${lancados} lançado${lancados===1?'':'s'}`);
+  else if(agendados) showToast('ok',`${agendados} na agenda de pagamentos`);
   if(pendentes){
     setTimeout(()=>{ setTab('revisao');
       showToast('warn',`${pendentes===1?'1 lançamento precisa':pendentes+' lançamentos precisam'} da sua conferência`); },lancados?600:200);
@@ -2919,6 +3119,151 @@ function ligarHoldVoz(){
   window.addEventListener('pointerup',soltarVoz);
   window.addEventListener('pointercancel',()=>{ if(holdAtivo){ holdCancelado=true; soltarVoz(); } });
   fab.addEventListener('contextmenu',e=>e.preventDefault());
+}
+
+// ══════════════════════════════════════════════════
+// AGENDA: TELA E AÇÕES
+// ══════════════════════════════════════════════════
+function openAgenda(){ renderAgenda(); openMo('mo-agenda'); }
+
+function renderAgenda(){
+  const grupos=agendaAgrupada();
+  const el=document.getElementById('ag-conteudo');
+  if(!grupos.length){
+    el.innerHTML=`<div class="note">Nada marcado para pagar. Quando chegar um boleto,
+      cadastre aqui ou fale segurando o microfone — <i>"boleto da Tecidos São Paulo,
+      mil e duzentos, vence dia 20"</i>.</div>`;
+    return;
+  }
+  const total=grupos.reduce((s,g)=>s+g.total,0);
+  el.innerHTML=`
+    <div class="note" style="margin-bottom:16px">
+      <b>${fmt(total)}</b> a pagar nos próximos dias${filter.unit==='all'?'':' em '+esc(getUnit(filter.unit).name)}.
+      As contas fixas entram com o valor cadastrado — luz e água variam, por isso aparecem
+      como aproximadas — e só as que ainda vão vencer neste mês.
+    </div>
+    ${grupos.map(g=>`
+      <div class="ag-grupo${g.ordem<=1?' urgente':''}">
+        <div class="ag-cab"><div class="ag-tit">${g.titulo}</div><div class="ag-tot">${fmt(g.total)}</div></div>
+        <div class="lst">${g.itens.map(i=>linhaAgendaHTML(i)).join('')}</div>
+      </div>`).join('')}`;
+}
+
+function linhaAgendaHTML(i){
+  const d=diasAte(i.venc);
+  const cat=getCat(i.cat);
+  const atraso=d<0?`<span class="ag-tag atraso">${-d} dia${d===-1?'':'s'} de atraso</span>`:'';
+  const aprox=i.aproximado?`<span class="ag-tag aprox">valor aproximado</span>`:'';
+  return `<div class="ag-row">
+    <div class="row-ico"><span class="sw" style="background:${cat.cor}"></span></div>
+    <div class="ag-info">
+      <div class="ag-nome">${esc(i.desc||cat.label)}</div>
+      <div class="ag-meta">${fmtDateFull(i.venc)} · ${cat.label} · ${esc(getUnit(i.unit).name)}${i.forn?' · '+esc(i.forn):''}</div>
+      ${atraso}${aprox}
+    </div>
+    <div class="ag-dir">
+      <div class="ag-val" style="color:var(--red)">${fmt(i.valor)}</div>
+      <div class="ag-pagar" onclick="pagarDaAgenda('${esc(i.id)}')">pagar</div>
+      ${i.tipo==='boleto'?`<div class="ag-pagar" style="color:var(--muted)" onclick="openEditPagar('${esc(i.id)}')">editar</div>`:''}
+    </div>
+  </div>`;
+}
+
+// Pagar abre o lançamento já preenchido: ele confere o valor (a luz nunca vem
+// igual ao previsto), escolhe a data e salva. Aí sim vira saída de caixa.
+function pagarDaAgenda(id){
+  const item=agendaItens().find(i=>i.id===id);
+  if(!item){ showToast('warn','Conta não encontrada'); return; }
+  closeMo('mo-agenda');
+  openLanc('out');
+  document.getElementById('l-valor').value=item.valor||'';
+  document.getElementById('l-desc').value=item.desc||'';
+  document.getElementById('l-forn').value=item.forn||'';
+  document.getElementById('l-conta').value=item.conta||'';
+  document.getElementById('l-venc').value=item.venc||'';
+  document.getElementById('l-data').value=today();
+  if(item.cat) document.getElementById('l-cat').value=item.cat;
+  if(item.unit) document.getElementById('l-unit').value=item.unit;
+  if(item.fixa_id) document.getElementById('l-fixa').value=item.fixa_id;
+  pagandoAgendaId = item.tipo==='boleto' ? item.id : null;
+  calcAtraso(); calcLancPreview();
+  showToast('info','Confira o valor e salve para dar baixa');
+}
+let pagandoAgendaId=null;
+
+// Chamado depois que o lançamento é salvo: tira o boleto da agenda.
+function baixarAgenda(){
+  if(!pagandoAgendaId) return;
+  const a=getPagar(pagandoAgendaId);
+  if(a){ a.pago=true; a.pago_em=today(); }
+  pagandoAgendaId=null;
+}
+
+function populatePagarModal(){
+  document.getElementById('ap-cat').innerHTML=catsOut().map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join('');
+  document.getElementById('ap-unit').innerHTML=units.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  document.getElementById('dl-contas').innerHTML=contasUsadas().map(c=>`<option value="${esc(c)}"></option>`).join('');
+}
+let editandoPagarId=null;
+
+function openAddPagar(){
+  editandoPagarId=null;
+  populatePagarModal();
+  document.getElementById('ap-titulo').textContent='Nova conta a pagar';
+  ['ap-desc','ap-forn','ap-valor','ap-conta','ap-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ap-venc').value='';
+  document.getElementById('ap-cat').value='tecido';
+  document.getElementById('ap-del').style.display='none';
+  closeMo('mo-agenda');
+  openMo('mo-apagar');
+}
+
+function openEditPagar(id){
+  const a=getPagar(id); if(!a) return;
+  editandoPagarId=id;
+  populatePagarModal();
+  document.getElementById('ap-titulo').textContent='Conta a pagar';
+  document.getElementById('ap-desc').value=a.desc||'';
+  document.getElementById('ap-forn').value=a.forn||'';
+  document.getElementById('ap-valor').value=a.valor||'';
+  document.getElementById('ap-venc').value=a.venc||'';
+  document.getElementById('ap-cat').value=a.cat||'tecido';
+  document.getElementById('ap-unit').value=a.unit||units[0]?.id;
+  document.getElementById('ap-conta').value=a.conta||'';
+  document.getElementById('ap-obs').value=a.obs||'';
+  document.getElementById('ap-del').style.display='block';
+  closeMo('mo-agenda');
+  openMo('mo-apagar');
+}
+
+function salvarPagar(){
+  const desc=document.getElementById('ap-desc').value.trim();
+  const valor=parseFloat(document.getElementById('ap-valor').value);
+  const venc=document.getElementById('ap-venc').value;
+  if(!desc){ showToast('warn','Diga do que se trata'); return; }
+  if(!valor||valor<=0){ showToast('warn','Informe o valor'); return; }
+  if(!ehData(venc)){ showToast('warn','Informe o vencimento'); return; }
+  const dados={
+    id:editandoPagarId||'ap'+Date.now()+Math.floor(Math.random()*1000),
+    desc, valor, venc,
+    forn:document.getElementById('ap-forn').value.trim(),
+    cat:document.getElementById('ap-cat').value,
+    unit:document.getElementById('ap-unit').value,
+    conta:registrarConta(document.getElementById('ap-conta').value),
+    obs:document.getElementById('ap-obs').value,
+    criado:today(), pago:false};
+  if(editandoPagarId) apagar=apagar.map(a=>a.id===editandoPagarId?{...a,...dados}:a);
+  else apagar.push(dados);
+  save(); closeMo('mo-apagar'); renderPage(currentTab);
+  showToast('ok',editandoPagarId?'Conta atualizada':`Agendado para ${fmtDateFull(venc)}`);
+}
+
+function removerPagar(){
+  if(!editandoPagarId) return;
+  if(!confirm('Tirar esta conta da agenda?')) return;
+  apagar=apagar.filter(a=>a.id!==editandoPagarId);
+  save(); closeMo('mo-apagar'); renderPage(currentTab);
+  showToast('del','Tirada da agenda');
 }
 
 // ══════════════════════════════════════════════════
@@ -3799,6 +4144,9 @@ function estadoParaIA(){
       movimento_por_conta_no_periodo: porConta,
       dre_do_periodo: calcularDRE(filter.regime||'competencia'),
     },
+    agenda_a_pagar: agendaItens().map(i=>({id:i.id, descricao:i.desc, fornecedor:i.forn||null,
+      valor:i.valor, vencimento:i.venc, dias_ate_vencer:diasAte(i.venc), categoria:i.cat,
+      unidade:i.unit, tipo:i.tipo, valor_aproximado:i.aproximado})),
     despesas_parceladas_abertas: compsAbertos().map(c=>({id:c.id,descricao:c.desc,
       total:c.valor_total,pago:compPago(c.id),falta:compSaldo(c),fornecedor:c.forn})),
     comprovantes_aguardando_conferencia: revisao.length,
@@ -3909,6 +4257,43 @@ const ACOES={
     run:a=>{ const m=getMaq(a.id); if(!m) throw new Error('maquininha não encontrada');
       if(lancamentos.some(l=>l.maq_id===a.id)) throw new Error(`"${m.name}" tem vendas registradas`);
       maquinas=maquinas.filter(x=>x.id!==a.id); return `Maquininha "${m.name}" removida`; }},
+
+  criar_conta_pagar:{
+    desc:a=>`Agendar "${a.descricao}" de ${fmt(num(a.valor,0,1e9)||0)} para ${a.vencimento?fmtDateFull(a.vencimento):'(sem data)'}`,
+    run:a=>{ const d=txt(a.descricao); if(!d) throw new Error('descrição inválida');
+      const v=num(a.valor,0.01,1e9); if(v===null) throw new Error('valor inválido');
+      if(!ehData(a.vencimento)) throw new Error('vencimento inválido');
+      const c=getCatValida(a.categoria,'out'); if(!c) throw new Error('categoria inválida');
+      const u=units.find(x=>x.id===a.unidade); if(!u) throw new Error('unidade não encontrada');
+      apagar.push({id:'ap'+Date.now()+apagar.length, desc:d, forn:txt(a.fornecedor)||'',
+        valor:v, venc:a.vencimento, cat:c.id, unit:u.id, conta:registrarConta(a.conta||''),
+        obs:'', criado:today(), pago:false, origem:'ia'});
+      return `"${d}" (${fmt(v)}) agendado para ${fmtDateFull(a.vencimento)}`; }},
+  editar_conta_pagar:{
+    desc:a=>{ const p=getPagar(a.id);
+      const campos={...a}; delete campos.acao; delete campos.id;
+      if(campos.vencimento) campos.vencimento=fmtDateFull(campos.vencimento);
+      if(campos.valor!=null) campos.valor=fmt(campos.valor);
+      return `${p?'"'+p.desc+'"':'Conta a pagar'}: ${Object.entries(campos).map(([k,v])=>k+' '+v).join(', ')||'sem mudança'}`; },
+    run:a=>{ const p=getPagar(a.id); if(!p) throw new Error('conta a pagar não encontrada');
+      const mudou=[];
+      if(a.descricao!=null){ const d=txt(a.descricao); if(d){ p.desc=d; mudou.push('descrição'); } }
+      if(a.fornecedor!=null){ p.forn=txt(a.fornecedor)||''; mudou.push('fornecedor'); }
+      if(a.valor!=null){ const v=num(a.valor,0.01,1e9); if(v===null) throw new Error('valor inválido');
+        p.valor=v; mudou.push('valor'); }
+      if(a.vencimento!=null){ if(!ehData(a.vencimento)) throw new Error('vencimento inválido');
+        p.venc=a.vencimento; mudou.push('vencimento'); }
+      if(a.categoria!=null){ const c=getCatValida(a.categoria,'out'); if(!c) throw new Error('categoria inválida');
+        p.cat=c.id; mudou.push('categoria'); }
+      if(a.unidade!=null){ const u=units.find(x=>x.id===a.unidade); if(!u) throw new Error('unidade não encontrada');
+        p.unit=u.id; mudou.push('unidade'); }
+      if(!mudou.length) throw new Error('nada para mudar');
+      return `"${p.desc}": ${mudou.join(', ')} atualizado`; }},
+  remover_conta_pagar:{
+    desc:a=>{ const p=getPagar(a.id); return `Tirar "${p?p.desc:a.id}" da agenda`; },
+    run:a=>{ const p=getPagar(a.id); if(!p) throw new Error('conta a pagar não encontrada');
+      apagar=apagar.filter(x=>x.id!==a.id);
+      return `"${p.desc}" saiu da agenda`; }},
 
   criar_socio:{
     desc:a=>`Criar sócio "${a.nome}"`,
@@ -4054,6 +4439,9 @@ Formato de cada ação (use exatamente estes nomes de campo):
 {"acao":"criar_conta_fixa","descricao":"Aluguel Loja 1","valor":7000,"categoria":"aluguel","unidade":"u2","dia_vencimento":5}
 {"acao":"editar_conta_fixa","id":"f1","valor":7200}
 {"acao":"remover_conta_fixa","id":"f2"}
+{"acao":"criar_conta_pagar","descricao":"Boleto tecido malha","fornecedor":"Tecidos SP","valor":1200,"vencimento":"2026-08-20","categoria":"tecido","unidade":"u1","conta":"Bradesco"}
+{"acao":"editar_conta_pagar","id":"ap123","valor":1250,"vencimento":"2026-08-25"}
+{"acao":"remover_conta_pagar","id":"ap123"}
 {"acao":"criar_lancamento","tipo":"out","valor":540,"categoria":"tecido","unidade":"u1","descricao":"Tecido malha","fornecedor":"Tecidos SP","data":"2026-07-28","vencimento":null}
 {"acao":"definir_periodo","periodo":"mesx","mes":"2026-06"}
 {"acao":"definir_unidade_exibida","unidade":"u2"}
@@ -4066,6 +4454,9 @@ REGRAS
 - Taxa é porcentagem (1.2 quer dizer 1,2%). Prazo é em dias.
 - Se ele pedir algo fora dessas ações, explique em uma frase o que ele mesmo faz na tela.
 - Nunca proponha remover nada sem ele ter pedido claramente.
+- AGENDA DE PAGAMENTOS: "agenda_a_pagar" tem o que ainda vai vencer — boletos que ele cadastrou e as contas fixas do mês que ainda não foram pagas. Use isso para responder "o que eu tenho que pagar hoje / amanhã / essa semana" (o campo dias_ate_vencer resolve: 0 é hoje, 1 amanhã, negativo é atraso). Some os valores quando ele pedir o total.
+- Conta a pagar é dívida com data, não é saída de caixa. Quando ele disser que CHEGOU um boleto ou que TEM QUE PAGAR algo, use criar_conta_pagar. Quando ele disser que JÁ PAGOU, use criar_lancamento. Nunca as duas para o mesmo pagamento.
+- Itens da agenda cujo id começa com "fx:" são contas fixas, não dá para editar nem remover por aqui — para mudar o valor use editar_conta_fixa.
 - Para lançar vários pagamentos de uma vez sem comprovante, ele pode falar: o botão de microfone, ao lado do +, grava e transforma a fala em lançamentos para ele conferir.
 - Contas fixas: até umas cinco você mesmo cria. Se ele tiver uma lista comprida, é mais rápido mandar ele abrir Config › Contas fixas mensais › "Importar lista" e colar tudo de uma vez.
 
@@ -4125,7 +4516,7 @@ function renderChat(){
     el.innerHTML=`<div class="chat-vazio">
       <div class="chat-vazio-t">Pode perguntar ou pedir para mudar algo</div>
       <div class="chat-sug">
-        ${['Quanto gastei com tecido este mês?','Qual foi meu lucro em junho?','Corrigir as taxas das maquininhas','Cadastrar uma conta fixa']
+        ${['O que eu tenho que pagar essa semana?','Quanto gastei com tecido este mês?','Chegou um boleto de mil reais da Tecidos SP, vence dia 20','Corrigir as taxas das maquininhas']
           .map(s=>`<button class="chat-sug-b" onclick="usarSugestao(${JSON.stringify(s).replace(/"/g,'&quot;')})">${s}</button>`).join('')}
       </div>
     </div>`;
@@ -4467,6 +4858,9 @@ function itemPendencias(it){
   if(!it.valor||it.valor<=0) p.push('valor');
   if(!it.cat) p.push('categoria');
   if(!it.unit) p.push('unidade');
+  // Conta a pagar não precisa saber a forma de pagamento ainda, mas sem
+  // vencimento não tem agenda.
+  if(it.agendar){ if(!ehData(it.data_venc)) p.push('vencimento'); return p; }
   if(it.tipo==='in'&&!it.pagtype) p.push('forma de pagamento');
   return p;
 }
@@ -4494,6 +4888,12 @@ function renderRevisao(){
         <div style="font-size:12px;font-weight:700;margin-bottom:10px">Conferir extrato bancário</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Compara os débitos do banco com o que já está lançado e mostra o que ficou de fora: tarifa, pedágio, débito pequeno.</div>
         <button class="btn-p btn-ghost" style="margin-top:0" onclick="openExtrato()">Importar extrato</button>
+      </div>
+      <div style="margin-top:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">Agenda de pagamentos</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Boletos e contas que ainda vão vencer. O que você paga hoje, amanhã e na semana que vem.</div>
+        <button class="btn-p btn-ghost" style="margin-top:0" onclick="openAgenda()">Abrir agenda</button>
+        <button class="btn-p btn-ghost" onclick="openAddPagar()">+ Conta a pagar</button>
       </div>
       <div style="margin-top:16px;background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:16px">
         <div style="font-size:12px;font-weight:700;margin-bottom:10px">Lançamento manual</div>
@@ -4527,11 +4927,12 @@ function renderRevisao(){
 
   html+=`<div style="margin-top:16px">
     <button class="btn-p ${pend.length?'btn-ghost':'btn-green'}" onclick="lancarRevisao()">
-      ${pend.length?`Lançar ${okN} pronto${okN===1?'':'s'} (${pend.length} ficam pendentes)`:`✓ Lançar ${revisao.length} lançamento${revisao.length===1?'':'s'}`}
+      ${pend.length?`Lançar ${okN} pronto${okN===1?'':'s'} (${pend.length} ficam pendentes)`:`✓ Lançar ${revisao.length} ${revisao.length===1?'item':'itens'}`}
     </button>
     <button class="btn-p btn-ghost" onclick="pickFiles()">Adicionar mais comprovantes</button>
     <button class="btn-p btn-ghost" onclick="openVoz()">Adicionar falando</button>
     <button class="btn-p btn-ghost" onclick="colarComprovante()">Colar comprovante copiado</button>
+    <button class="btn-p btn-ghost" onclick="openAgenda()">Agenda de pagamentos</button>
     <button class="btn-p btn-ghost" onclick="openExtrato()">Conferir extrato bancário</button>
     <button class="btn-p btn-del" onclick="descartarRevisao()">Descartar remessa</button>
   </div>`;
@@ -4553,6 +4954,7 @@ function revRowHTML(it,i){
       <div class="row-meta">${isIn?'Entrada':'Saída'}${cat?' · '+cat.label:''}${it.unit?' · '+getUnit(it.unit).name:''} · ${fmtDate(it.data)}</div>
       ${it.origem==='extrato'?`<div class="rev-src">do extrato</div>`:''}
       ${it.origem==='voz'?`<div class="rev-src">do ditado</div>`:''}
+      ${it.agendar?`<div class="rev-src" style="background:var(--yellow-d);color:var(--yellow)">a pagar${ehData(it.data_venc)?' · vence '+fmtDate(it.data_venc):''}</div>`:''}
       ${it.conta?`<div class="rev-src" style="background:var(--s2);color:var(--text2)">${esc(it.conta)}</div>`:''}
       ${it.origem==='voz'&&it.frase?`<div class="rev-duv" style="font-style:italic">“${esc(it.frase)}”</div>`:''}
       ${it.unit_falada&&!it.unit?`<div class="rev-duv">Você falou <b>${esc(it.unit_falada)}</b>, que não está nas suas lojas.
@@ -4692,6 +5094,15 @@ function descartarRevisaoItem(){
 // Um item conferido vira lançamento. Serve tanto para a remessa da noite quanto
 // para o ditado, que lança na hora quando não falta nada.
 function lancarItem(it){
+  // Boleto conferido não vira saída de caixa: vai para a agenda esperar o dia.
+  if(it.agendar){
+    const nova={id:'ap'+Date.now()+Math.floor(Math.random()*1000),
+      desc:it.desc||getCat(it.cat).label, forn:it.forn||'', valor:it.valor,
+      venc:it.data_venc, cat:it.cat, unit:it.unit, conta:registrarConta(it.conta),
+      obs:it.obs||'', criado:today(), pago:false, origem:it.origem||'revisao'};
+    apagar.push(nova);
+    return nova;
+  }
   let compId=it.comp_id||null;
   if(!compId&&it.comp_novo_total){
     const novo={id:'c'+Date.now()+Math.floor(Math.random()*10000),
