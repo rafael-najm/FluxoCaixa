@@ -569,6 +569,34 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
         <div class="field"><label>Taxa 2–6x %</label><input type="number" id="mq-tc2" step=".01" placeholder="3.5"/></div>
         <div class="field"><label>Taxa 7x+ %</label><input type="number" id="mq-tc7" step=".01" placeholder="4.2"/></div>
       </div>
+      <div class="note" id="mq-aviso" style="margin-top:4px;display:none">
+        As taxas desta maquininha ainda são de exemplo, colocadas na montagem do app.
+        Elas mudam o valor líquido de cada venda, a data em que o dinheiro cai e todas as
+        margens do relatório. Confira no contrato ou no app da maquininha.
+      </div>
+
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px">Não sabe a taxa de cabeça?</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:10px">
+        Pegue uma venda que já caiu na conta e eu calculo a taxa: o app da maquininha mostra
+        quanto foi a venda e quanto entrou.
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Venda foi de (R$)</label><input type="number" id="mq-calc-bruto" inputmode="decimal" step=".01" placeholder="250,00"/></div>
+        <div class="field"><label>Caiu na conta (R$)</label><input type="number" id="mq-calc-liq" inputmode="decimal" step=".01" placeholder="242,75"/></div>
+      </div>
+      <div class="field"><label>Essa venda foi em</label>
+        <select id="mq-calc-tipo">
+          <option value="td">Débito</option>
+          <option value="tc1">Crédito 1x</option>
+          <option value="tc2">Crédito 2 a 6x</option>
+          <option value="tc7">Crédito 7x ou mais</option>
+        </select>
+      </div>
+      <button class="btn-p btn-ghost" style="margin-top:0" onclick="calcularTaxa()">Calcular e preencher</button>
+      <div id="mq-calc-res" style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5"></div>
+
+      <div class="divider"></div>
       <button class="btn-p btn-green" onclick="saveMaq()">Salvar máquina</button>
       <button class="btn-p btn-ghost" onclick="closeMo('mo-maq')">Cancelar</button>
       <button class="btn-p btn-del" id="mq-del-btn" onclick="deleteMaq()" style="display:none">Excluir máquina</button>
@@ -818,13 +846,14 @@ const DEFAULT_UNITS = [
   {id:'u5',name:'Cinelândia'},
   {id:'u6',name:'Largo do Machado'},
 ];
-// Taxas e prazos aqui são só um ponto de partida: cada maquininha precisa ser
-// conferida no contrato, senão o líquido das vendas sai errado.
+// Taxa de maquininha é negociada caso a caso: ninguém de fora sabe a dele. Estas
+// são de exemplo, só para o app funcionar no primeiro dia, e vêm marcadas como
+// não conferidas — enquanto estiverem assim, todo lugar que usa o líquido avisa.
 const DEFAULT_MAQUINAS = [
-  {id:'m1',name:'Stone Flores',unit:'u2',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#2F6F5E'},
-  {id:'m2',name:'Cielo Flores',unit:'u2',taxa_debito:1.8,taxa_credito_1x:3.1,taxa_credito_2_6x:3.8,taxa_credito_7x:4.5,prazo_debito:1,prazo_credito:28,cor:'#3F5F82'},
-  {id:'m3',name:'Stone Tame',unit:'u3',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#5B5486'},
-  {id:'m4',name:'PagSeguro Tame',unit:'u3',taxa_debito:2.0,taxa_credito_1x:3.3,taxa_credito_2_6x:4.0,taxa_credito_7x:4.8,prazo_debito:2,prazo_credito:30,cor:'#8A5A3C'},
+  {id:'m1',name:'Stone Flores',unit:'u2',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#2F6F5E',taxas_conferidas:false},
+  {id:'m2',name:'Cielo Flores',unit:'u2',taxa_debito:1.8,taxa_credito_1x:3.1,taxa_credito_2_6x:3.8,taxa_credito_7x:4.5,prazo_debito:1,prazo_credito:28,cor:'#3F5F82',taxas_conferidas:false},
+  {id:'m3',name:'Stone Tame',unit:'u3',taxa_debito:1.5,taxa_credito_1x:2.8,taxa_credito_2_6x:3.5,taxa_credito_7x:4.2,prazo_debito:1,prazo_credito:30,cor:'#5B5486',taxas_conferidas:false},
+  {id:'m4',name:'PagSeguro Tame',unit:'u3',taxa_debito:2.0,taxa_credito_1x:3.3,taxa_credito_2_6x:4.0,taxa_credito_7x:4.8,prazo_debito:2,prazo_credito:30,cor:'#8A5A3C',taxas_conferidas:false},
 ];
 
 let units    = JSON.parse(localStorage.getItem(SK_U)||'null') || DEFAULT_UNITS;
@@ -1057,6 +1086,23 @@ function fixaPagamentos(f, mes){
   return lancamentos.filter(l=>l.tipo==='out'&&mesDe(l.data)===mes&&!l.fixa_id&&l.cat===f.cat&&l.unit===f.unit);
 }
 function fixaPago(f, mes){ return fixaPagamentos(f,mes).reduce((s,l)=>s+(l.valor||0),0); }
+
+// ── TAXAS AINDA NÃO CONFERIDAS ──
+// Enquanto ele não confirmar a taxa de uma maquininha, todo número derivado dela
+// (líquido, margem, DRE) está apoiado num chute. Melhor dizer isso na cara.
+const maqPendente = m => m && m.taxas_conferidas!==true;
+function maquinasPendentes(){ return maquinas.filter(maqPendente); }
+// Só incomoda quem realmente usa cartão: quem vende só no PIX não precisa ver isso.
+function maquinasPendentesEmUso(lista){
+  const usadas=new Set((lista||lancamentos).filter(l=>l.maq_id).map(l=>l.maq_id));
+  return maquinas.filter(m=>maqPendente(m)&&usadas.has(m.id));
+}
+const avisoTaxasHTML = (ms, extra) => !ms.length ? '' :
+  `<div class="note" style="border-left:2px solid var(--yellow);margin-top:10px">
+     ${ms.length===1?`A taxa da <b>${esc(ms[0].name)}</b> ainda é de exemplo`
+                    :`As taxas de <b>${ms.length} maquininhas</b> ainda são de exemplo`}, então ${extra}.
+     <span style="color:var(--accent);cursor:pointer" onclick="conferirProximaTaxa()">Conferir agora</span>.
+   </div>`;
 
 function calcLiquido(bruto, tipo, maq){
   if(!maq||tipo==='pix') return bruto;
@@ -1330,7 +1376,8 @@ function renderHome(){
       <div class="hg-item"><div class="hg-lbl">A receber</div><div class="hg-val" style="color:var(--yellow)">${fmt(pendente)}</div></div>
       <div class="hg-item"><div class="hg-lbl">Lançamentos</div><div class="hg-val">${data.length}</div></div>
     </div>
-  </div>`;
+  </div>
+  ${avisoTaxasHTML(maquinasPendentesEmUso(data),'o que está em taxas e o que aparece como "na conta" ainda são estimativas')}`;
 
   if(upcoming.length){
     html+=`<div class="sh"><div class="st">A receber</div><div class="sa" onclick="setTab('lancamentos')">Ver tudo →</div></div><div class="lst">`;
@@ -1582,6 +1629,7 @@ function renderRelatorio(){
         <div style="text-align:right"><div class="rel-val" style="color:var(--green)">${fmt(liq)}</div><div style="font-size:10px;color:var(--red)">−${fmt(tx)} taxas</div></div>
       </div>`;
     }).join('');
+    html+=avisoTaxasHTML(maquinasPendentesEmUso(data),'estes valores de taxa e líquido não são os de verdade');
     html+=`</div>`;
   }
 
@@ -1930,12 +1978,14 @@ function renderConfig(){
   :`<div style="background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center;font-size:12px;color:var(--muted)">Nenhuma conta fixa cadastrada ainda.<br>Cole a sua lista em <span style="color:var(--accent);cursor:pointer" onclick="openImportFixas()">Importar lista</span>.</div>`}
 
   <div class="sh"><div class="st">Maquininhas</div><div class="sa" onclick="openAddMaq()">+ Nova</div></div>
-  <div class="lst">${maquinas.map(m=>`
+  ${avisoTaxasHTML(maquinasPendentes(),'o líquido das vendas, a data em que o dinheiro cai e as margens do relatório ainda estão apoiados num chute')}
+  <div class="lst" style="margin-top:8px">${maquinas.map(m=>`
     <div class="row" onclick="openEditMaq('${m.id}')">
       <div class="row-ico"><svg class="ic"><use href="#i-card"/></svg></div>
       <div class="row-info">
         <div class="row-name">${m.name}</div>
         <div class="row-meta">${esc(getUnit(m.unit).name)} · Déb ${m.taxa_debito}% · Créd ${m.taxa_credito_1x}% · Prazo ${m.prazo_credito}d</div>
+        ${maqPendente(m)?`<div class="rev-src" style="background:var(--yellow-d);color:var(--yellow)">taxa de exemplo</div>`:''}
       </div>
       <div class="chev"><svg class="ic ic-sm"><use href="#i-chevron"/></svg></div>
     </div>`).join('')}</div>
@@ -2192,7 +2242,8 @@ function calcLancPreview(){
   const liq=calcLiquido(val,pagtype,maq);
   const rec=calcDataRec(pagtype,maq);
   pb.style.display='flex'; pb.className='preview-box';
-  pb.innerHTML=`<div><div class="pb-lbl">Valor líquido estimado</div><div class="pb-sub">Recebimento: ${fmtDateFull(rec)}</div></div><div class="pb-val in">${fmt(liq)}</div>`;
+  const chute=pagtype!=='pix'&&maqPendente(maq)?`<div class="pb-sub" style="color:var(--yellow)">Taxa da ${esc(maq.name)} ainda é de exemplo</div>`:'';
+  pb.innerHTML=`<div><div class="pb-lbl">Valor líquido estimado</div><div class="pb-sub">Recebimento: ${fmtDateFull(rec)}</div>${chute}</div><div class="pb-val in">${fmt(liq)}</div>`;
 }
 
 function openLanc(tipo){
@@ -2893,8 +2944,41 @@ function aplicarImportFixas(){
 // ══════════════════════════════════════════════════
 // MODAL MÁQUINA
 // ══════════════════════════════════════════════════
+// Ele não decora taxa, mas tem o extrato: de uma venda que já caiu dá para
+// deduzir quanto a maquininha ficou.
+function calcularTaxa(){
+  const bruto=parseFloat(document.getElementById('mq-calc-bruto').value);
+  const liq=parseFloat(document.getElementById('mq-calc-liq').value);
+  const res=document.getElementById('mq-calc-res');
+  if(!bruto||bruto<=0||!liq||liq<=0){ res.textContent='Preencha os dois valores.'; return; }
+  if(liq>bruto){ res.textContent='O que caiu não pode ser maior que a venda. Confira os valores.'; return; }
+  const taxa=Math.round((1-liq/bruto)*10000)/100;
+  if(taxa>25){ res.textContent=`Isso daria ${pctTxt(taxa)}, alto demais para taxa de maquininha. Confira se os dois valores são da mesma venda.`; return; }
+  const campo=document.getElementById('mq-calc-tipo').value;
+  document.getElementById('mq-'+campo).value=taxa;
+  const nomes={td:'débito',tc1:'crédito 1x',tc2:'crédito 2 a 6x',tc7:'crédito 7x ou mais'};
+  res.innerHTML=`A maquininha ficou com <b>${fmt(bruto-liq)}</b> de <b>${fmt(bruto)}</b>, ou seja <b>${pctTxt(taxa)}</b>.
+    Preenchi a taxa de ${nomes[campo]}. Falta salvar.`;
+}
+
+// Abre a próxima maquininha com taxa de exemplo. Ao salvar, vai para a seguinte,
+// então ele resolve todas numa sentada.
+function conferirProximaTaxa(){
+  const pend=maquinasPendentes();
+  if(!pend.length){ showToast('ok','Todas as taxas já estão conferidas'); return; }
+  ['mo-chat','mo-voz','mo-lanc'].forEach(id=>closeMo(id));
+  openEditMaq(pend[0].id);
+}
+
+function limparCalcTaxa(){
+  ['mq-calc-bruto','mq-calc-liq'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mq-calc-res').innerHTML='';
+}
+
 function openAddMaq(){
   editingMaqId=null;
+  limparCalcTaxa();
+  document.getElementById('mq-aviso').style.display='none';
   document.getElementById('mo-maq-title').textContent='Nova Máquina';
   document.getElementById('mq-nome').value='';
   document.getElementById('mq-cor').value='#2F6F5E';
@@ -2911,7 +2995,10 @@ function openAddMaq(){
 function openEditMaq(id){
   const m=maquinas.find(x=>x.id===id); if(!m) return;
   editingMaqId=id;
-  document.getElementById('mo-maq-title').textContent='Editar Máquina';
+  limparCalcTaxa();
+  const pend=maqPendente(m);
+  document.getElementById('mq-aviso').style.display=pend?'block':'none';
+  document.getElementById('mo-maq-title').textContent=pend?'Conferir taxas':'Editar Máquina';
   document.getElementById('mq-unit').innerHTML=units.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
   document.getElementById('mq-nome').value=m.name;
   document.getElementById('mq-cor').value=m.cor;
@@ -2936,11 +3023,33 @@ function saveMaq(){
     taxa_credito_1x:parseFloat(document.getElementById('mq-tc1').value)||3.0,
     taxa_credito_2_6x:parseFloat(document.getElementById('mq-tc2').value)||3.8,
     taxa_credito_7x:parseFloat(document.getElementById('mq-tc7').value)||4.5,
-    prazo_credito:parseInt(document.getElementById('mq-pc').value)||30};
+    prazo_credito:parseInt(document.getElementById('mq-pc').value)||30,
+    // Ele mesmo olhou e salvou: a partir daqui a taxa é dele, não do exemplo.
+    taxas_conferidas:true};
   if(editingMaqId) maquinas=maquinas.map(m=>m.id===editingMaqId?{...m,...data}:m);
   else maquinas.push({...data,id:'m'+Date.now()});
+  // O líquido dos lançamentos antigos foi calculado com a taxa velha.
+  const refeitos=recalcularLiquidos();
   save(); closeMo('mo-maq'); renderPage(currentTab);
-  showToast('ok','Máquina salva');
+  const faltam=maquinasPendentes().length;
+  showToast('ok','Taxas salvas'+(refeitos?` · ${refeitos} venda${refeitos===1?'':'s'} recalculada${refeitos===1?'':'s'}`:''));
+  if(faltam) setTimeout(()=>{
+    if(confirm(`Faltam ${faltam} maquininha${faltam===1?'':'s'} com taxa de exemplo. Conferir agora?`)) conferirProximaTaxa();
+  },400);
+}
+
+// Taxa corrigida precisa valer para o que já foi lançado, senão o relatório
+// continua mostrando o líquido velho.
+function recalcularLiquidos(){
+  let n=0;
+  lancamentos.forEach(l=>{
+    if(l.tipo!=='in'||!l.maq_id) return;
+    const maq=getMaq(l.maq_id); if(!maq) return;
+    const bruto=l.val_bruto||l.valor;
+    const novo=calcLiquido(bruto,l.pagtype,maq);
+    if(Math.abs((l.valor_liquido||0)-novo)>0.005){ l.valor_liquido=novo; n++; }
+  });
+  return n;
 }
 function deleteMaq(){
   maquinas=maquinas.filter(m=>m.id!==editingMaqId);
@@ -3438,7 +3547,8 @@ function estadoParaIA(){
     maquinas: maquinas.map(m=>({id:m.id,nome:m.name,unidade:m.unit,
       taxa_debito:m.taxa_debito,taxa_credito_1x:m.taxa_credito_1x,
       taxa_credito_2_6x:m.taxa_credito_2_6x,taxa_credito_7x:m.taxa_credito_7x,
-      prazo_debito:m.prazo_debito,prazo_credito:m.prazo_credito})),
+      prazo_debito:m.prazo_debito,prazo_credito:m.prazo_credito,
+      taxas_conferidas:m.taxas_conferidas===true})),
     socios: socios.map(s=>({id:s.id,nome:s.name})),
     contas_bancarias: contas,
     contas_fixas: fixas.map(f=>({id:f.id,descricao:f.desc,valor:f.valor,
@@ -3523,7 +3633,9 @@ const ACOES={
         taxa_credito_7x:num(a.taxa_credito_7x,0,100)??num(a.taxa_credito_1x,0,100)??4.5,
         prazo_debito:num(a.prazo_debito,0,180)??1,
         prazo_credito:num(a.prazo_credito,0,180)??30,
-        cor:SOCIO_CORES[maquinas.length%SOCIO_CORES.length]};
+        cor:SOCIO_CORES[maquinas.length%SOCIO_CORES.length],
+        // Taxa que veio dele pela conversa é taxa conferida.
+        taxas_conferidas:true};
       maquinas.push(m); return `Maquininha "${n}" criada em ${un.name}`; }},
   editar_maquina:{
     desc:a=>{ const m=getMaq(a.id);
@@ -3550,7 +3662,13 @@ const ACOES={
         }
       }
       if(!mudou.length) throw new Error('nada para mudar');
-      return `"${m.name}": ${mudou.join(', ')} atualizado`; }},
+      // Se ele acertou alguma taxa pelo chat, ela deixa de ser de exemplo e o
+      // líquido das vendas já lançadas é refeito.
+      const mexeuTaxa=mudou.some(x=>x.startsWith('taxa'));
+      if(mexeuTaxa) m.taxas_conferidas=true;
+      const refeitos=mexeuTaxa?recalcularLiquidos():0;
+      return `"${m.name}": ${mudou.join(', ')} atualizado`
+        + (refeitos?` · ${refeitos} venda(s) recalculada(s)`:''); }},
   remover_maquina:{
     desc:a=>{ const m=getMaq(a.id); return `Remover a maquininha "${m?m.name:a.id}"`; },
     run:a=>{ const m=getMaq(a.id); if(!m) throw new Error('maquininha não encontrada');
@@ -3717,7 +3835,7 @@ REGRAS
 - Contas fixas: até umas cinco você mesmo cria. Se ele tiver uma lista comprida, é mais rápido mandar ele abrir Config › Contas fixas mensais › "Importar lista" e colar tudo de uma vez.
 
 ATENÇÃO ÀS MAQUININHAS
-As maquininhas cadastradas vieram com taxas de exemplo, inventadas na montagem do app, que provavelmente não são as reais dele. Elas afetam o valor líquido das vendas, a data em que o dinheiro cai e todas as margens do relatório. Se notar que ele nunca as revisou, ofereça corrigir.
+Cada maquininha tem "taxas_conferidas". Quando for false, aquelas taxas são de exemplo, colocadas na montagem do app, e não as reais dele — o líquido das vendas, a data em que o dinheiro cai e as margens do relatório saem errados. Se houver alguma assim, ofereça corrigir: ele acha a taxa no contrato, no app da maquininha, ou comparando uma venda com o que caiu na conta (nesse caso a taxa é (1 - caiu/venda) x 100). Quando ele disser a taxa real, proponha editar_maquina. Não invente taxa nem sugira valores "de mercado": taxa é negociada e só ele tem a dele.
 
 ESTADO ATUAL DO SISTEMA (JSON)
 ${JSON.stringify(estadoParaIA())}
