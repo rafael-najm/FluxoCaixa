@@ -616,7 +616,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg-page);color
     <div class="chat-msgs" id="chat-msgs"></div>
     <div class="chat-bar">
       <textarea id="chat-input" rows="1" placeholder="Escreva sua pergunta ou peça uma mudança"
-        oninput="cresceCampo(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mandarChat();}"></textarea>
+        oninput="cresceCampo(this)" onkeydown="teclaChat(event)"></textarea>
       <button class="chat-send" onclick="mandarChat()" aria-label="Enviar"><svg class="ic"><use href="#i-arrow-up"/></svg></button>
     </div>
   </div>
@@ -3918,6 +3918,14 @@ function renderChat(){
 }
 
 function cresceCampo(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }
+
+// Enter quebra linha, como em qualquer campo de texto: quem manda é o botão.
+// Antes o Enter enviava, e a mensagem saía pela metade quando ele ia pular linha.
+// No computador o Ctrl+Enter (ou Cmd+Enter) continua enviando, para quem prefere.
+function teclaChat(e){
+  if(e.key!=='Enter') return;
+  if(e.ctrlKey||e.metaKey){ e.preventDefault(); mandarChat(); }
+}
 
 function usarSugestao(t){ document.getElementById('chat-input').value=t; mandarChat(); }
 
